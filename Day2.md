@@ -1,0 +1,92 @@
+# Day 2 - July 11
+
+## Ethics stuff
+
+### Ethics intro
+
+- Ethically delemas in robotics
+	- Focus on pratical questions
+	- Self driving car gets in accident
+		- Who is responsible?
+- Definition of a robot?
+- What makes a (moral) desicion right/wrong?
+	- Utilitarianism
+		- Greatest good for greatest number
+			- Happiness, wellbeing, etc
+		- Each person's happiness/wellbeing/etc is equally important
+		- Look at all consequences
+		- Predict consequences, then pick the best one
+			- There can be disagreement on what is best
+		- Example desicion:
+			- Choice of which charity to donate to
+				- Pick the one that will do the most "good"
+			- Self-driving cars
+				- Pros:
+					- Fewer accidents
+					- Less traffic
+					- More accessible tran
+				- Issues/disagreements:
+					- How to handle accidents?
+						- How to decide the consquences of a "controlled" crash?
+						- Favour saving most lives?
+						- Favour saving the driver/occupants?
+						- Favour the rule followers?
+						- Let the driver pick?
+				- Could be disagreement on which option creates the most good
+	- Deontology
+		- Focus on the action itself
+		- Some actions are inherently wrong
+		- Morality consists of duties which do not reduce to bringing about the most good
+			- Non-maleficence: do not harm others
+			- Beneficence: help others
+			- Justice
+			- Fidelity: keep promises
+			- etc
+		- Example Deontology ideas
+			- Framing an innocent person to quell unrest is wrong
+		- Considered judgement
+			- Conflicting duties, pick the best one
+				- Ex: stopping to save someone vs keeping promise to meet friend for coffee
+			- Rather vague/unsatisfying
+				- Similar to utilitarianism
+				- But captures moral reasoning process
+- How to argue for a position?
+	- Analogies to similar cases
+	- Coherence with other moral judgements
+
+### Ethics essays
+
+- Personal doc link: https://docs.google.com/document/d/13kogTF5_QhACpxvOFEE--iRUJ7lIfZbz4w233BD9S68/edit?usp=sharing
+- Purpose: think about the ethical dilemmas raised by new science and technology
+	- New science and technology can produce a lot of good, but also a lot of harm
+		- Nuclear energy: good for energy, but also weapons
+		- AI: good for automation, efficiency, but also job loss and deepfakes
+	- Developments can create new questions
+		- Machine learning and intellectual property
+		- Genetic engineering and designer babies/human enhancement
+- Goal: write an essay of a dilemma choosen by cluster
+	- Must be a matter/topic that reasonable people can disagree about
+		- Should we permit X?
+		- How should we regulate X?
+		- Do the benefits of X outweigh the harms?
+		- Do people have a right to X?
+	- Pick a side
+		- Convince the reader that your position is correct
+- Requirements
+	- Give credit to those who helped you
+	- No ChatGTP
+	- Title page
+		- Title, cluster number, cluster name
+		- Not name on the title page
+	- Max 5 pages
+		- Including tables/figures
+	- Max 1 page bibliography
+		- APA or MLA
+	- 1.5 line spacing
+	- 12pt font
+	- Calibri, Times New Roman, Arial
+	- 1 inch margins
+- Rubric
+	- Be straightfoward and organized
+	- Can give problems with your solution
+	- Concluding summary
