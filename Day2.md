@@ -2,13 +2,14 @@
 
 ## Ethics stuff
 
+Personal doc link: https://docs.google.com/document/d/13kogTF5_QhACpxvOFEE--iRUJ7lIfZbz4w233BD9S68/edit?usp=sharing
+
 ### Ethics intro
 
 - Ethically delemas in robotics
 	- Focus on pratical questions
 	- Self driving car gets in accident
 		- Who is responsible?
-- Definition of a robot?
 - What makes a (moral) desicion right/wrong?
 	- Utilitarianism
 		- Greatest good for greatest number
@@ -56,7 +57,6 @@
 
 ### Ethics essays
 
-- Personal doc link: https://docs.google.com/document/d/13kogTF5_QhACpxvOFEE--iRUJ7lIfZbz4w233BD9S68/edit?usp=sharing
 - Purpose: think about the ethical dilemmas raised by new science and technology
 	- New science and technology can produce a lot of good, but also a lot of harm
 		- Nuclear energy: good for energy, but also weapons
@@ -90,3 +90,75 @@
 	- Be straightfoward and organized
 	- Can give problems with your solution
 	- Concluding summary
+- Use research papers + opinion pieces
+
+### Brainstorming
+
+- Definition of a robot?
+	- Purpose
+	- Some level of autonomy
+	- Physical tasks/componenets
+- Need to split AI and robotics for the essay
+- Tasks a robot is used for:
+	- Manufacturing
+		- Efficiency
+		- Cheaper
+		- Takes away jobs
+	- Rescue
+		- Safer for humans
+		- Can go places humans can't
+		- Can make a mistake
+		- Expensive
+			- Wealth inequality/gap
+	- Self-driving cars
+		- Safer
+		- More efficient
+		- Can make a mistake/cause accidents
+			- Who to prioritize saving?
+	- Military
+		- Safer for US soldiers
+		- Lack of human judgement/responsibility
+	- Music playing robot
+		- Play live music perfectly without need of humans
+		- Less creative, not personal
+	- Surgery
+		- Better success rate
+		- Who is responsible for mistakes?
+	- Therapy
+		- Less stress
+		- More accessible
+		- Create disconnect, not human
+	- Learning
+		- More efficient, cheaper
+		- No sick days
+		- Can give more people access to education
+		- Takes away job
+		- Takes away teacher-student interaction/role model
+		- Not designed to help all students
+	- Elder care
+		- More efficient, cheaper, more accessible
+		- Not personal, missing human touch
+	- Cleaning
+	- Packing
+	- Soccer
+	- Research/exploration
+	- Surveillance
+		- Loss of privacy
+	- Agriculture
+- Art Robot
+	- Creative field - not seen as necessary/very personal
+- Surgical Robot
+	- Can raise success rates, but can fail 
+- Therapy Robot
+	- Lower stress, but can create disconnect/not human
+- Educational Robot
+	- Can serve areas that do not have teachers, no sick days; taking jobs away and students miss out on experience where you learn character, robots cannot necessarily help all students
+- Elderly Care Robot
+	- Elderly people might really need human interaction, can give privacy
+- Search and Rescue
+	- Robots can rescue from dangerous environment, can be very expensive - wealth inequality - can detect people under snow, might miss some people. 
+- Robots for crime prevention/management	
+	- Might have bias/incorrect ID, but lowers human danger
+- Exploration Robots 
+	- Space. Leave protected habitats alone, but can explore new places
+
