@@ -10,7 +10,8 @@
 # Libraries
 import evdev
 import RPi.GPIO as GPIO
-import time
+import adafruit_servokit
+# import time
 
 
 BUTTON_CODE_MAPPINGS = {
@@ -22,6 +23,32 @@ BUTTON_CODE_MAPPINGS = {
     'RB': 309,
 }
 
+STICK_CODE_MAPPINGS = {
+    'DOWNPRESSED': {
+        'UP': [1, 0],
+        'RIGHT': [0, 255],
+        'DOWN': [1, 255],
+        'LEFT': [0, 0],
+    },
+    'UPPRESSED': {
+        'UP': [1, 128],
+        'RIGHT': [0, 128],
+        'DOWN': [1, 128],
+        'LEFT': [0, 128],
+    }
+}
+
+SERVO_CHANNEL_MAPPINGS = {
+    'L': 0,
+    'R': 1,
+}
+
+# in degrees
+SERVO_START_ANGLES = {
+    'L': 0,
+    'R': 0,
+}
+
 buttons_down = {
     'X': False,
     'A': False,
@@ -31,16 +58,31 @@ buttons_down = {
     'RB': False,
 }
 
+sticks_down = {
+    'UP': False,
+    'RIGHT': False,
+    'DOWN': False,
+    'LEFT': False,
+}
+
 # GPIO Mode (BOARD / BCM)
-GPIO.setmode(GPIO.BOARD)
+# GPIO.setmode(GPIO.BOARD)
  
 # set GPIO Pins
-GPIO_Ain1 = 11
-GPIO_Ain2 = 13
-GPIO_Apwm = 15
-GPIO_Bin1 = 29
-GPIO_Bin2 = 31
-GPIO_Bpwm = 33
+# GPIO_Ain1 = 11
+# GPIO_Ain2 = 13
+# GPIO_Apwm = 15
+# GPIO_Bin1 = 29
+# GPIO_Bin2 = 31
+# GPIO_Bpwm = 33
+
+GPIO.setmode(GPIO.BCM)
+GPIO_Ain1 = 17
+GPIO_Ain2 = 27
+GPIO_Apwm = 22
+GPIO_Bin1 = 5
+GPIO_Bin2 = 6
+GPIO_Bpwm = 13
 
 # Set GPIO direction (IN / OUT)
 GPIO.setup(GPIO_Ain1, GPIO.OUT)
@@ -67,6 +109,11 @@ pwmB = GPIO.PWM(GPIO_Bpwm, pwm_frequency)
 # The duty cycle determines the speed of the wheels
 pwmA.start(0)
 pwmB.start(0)
+
+kit = adafruit_servokit.ServoKit(channels=16)
+for servo in SERVO_CHANNEL_MAPPINGS:
+    kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = SERVO_START_ANGLES[servo]
+
 #------------------------------------------------------------------------------#
 def set_button_downpressed(button, code_button, value_button):
     if BUTTON_CODE_MAPPINGS[button] == code_button:
@@ -75,6 +122,21 @@ def set_button_downpressed(button, code_button, value_button):
 def set_all_buttons_downpressed(code_button, value_button):
     for button in buttons_down:
         set_button_downpressed(button, code_button, value_button)
+
+def set_stick_downpressed(stick, code_stick, value_stick):
+    stick_code_mapping_downpressed = STICK_CODE_MAPPINGS['DOWNPRESSED'][stick]
+    if stick_code_mapping_downpressed[0] == code_stick and stick_code_mapping_downpressed[1] == value_stick:
+        sticks_down[stick] = True
+
+def set_stick_uppressed(stick, code_stick, value_stick):
+    stick_code_mapping_uppressed = STICK_CODE_MAPPINGS['UPPRESSED'][stick]
+    if stick_code_mapping_uppressed[0] == code_stick and stick_code_mapping_uppressed[1] == value_stick:
+        sticks_down[stick] = False
+
+def set_all_sticks_downpressed(code_stick, value_stick):
+    for stick in sticks_down:
+        set_stick_downpressed(stick, code_stick, value_stick)
+        set_stick_uppressed(stick, code_stick, value_stick)
 
 
 def close():
@@ -119,8 +181,7 @@ try:
         # currentTime = time.time()
 
         new_button = False
-
-        # newstick = False
+        new_stick = False
         try:
             # Use this option (and comment out the next line) to react to the latest event only
             # Use this option (and comment out the previous line) when you don't want to miss any event
@@ -132,10 +193,10 @@ try:
                 new_button = True
                 code_button = eventinfo.scancode
                 value_button = eventinfo.keystate
-                # elif event.type == 3:
-                #     newstick = True
-                #     codestick = eventinfo.event.code
-                #     valuestick = eventinfo.event.value
+            elif event.type == 3:
+                new_stick = True
+                code_stick = eventinfo.event.code
+                value_stick = eventinfo.event.value
         except:
             pass
 
