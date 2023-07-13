@@ -226,14 +226,16 @@ try:
         direction = Direction.BACKWARD if buttons_down['B'] else Direction.FORWARD
         power = Power.HIGH if buttons_down['Y'] else Power.LOW
 
+        # front_arm_position = FrontArmPosition.SNAP_DOWN if buttons_down['A'] else front_arm_position
+
 
         # only trigger on downpress
         if new_button and value_button == 1:
             if code_button == BUTTON_CODE_MAPPINGS['X']:
                 back_arm_position = BackArmPosition.UP if back_arm_position == BackArmPosition.DOWN else BackArmPosition.DOWN
                 kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = back_arm_position
-            elif code_button == BUTTON_CODE_MAPPINGS['A']:
-                front_arm_position = FrontArmPosition.SNAP_DOWN
+            # elif code_button == BUTTON_CODE_MAPPINGS['A']:
+            #     front_arm_position = FrontArmPosition.SNAP_DOWN
 
 
         if sticks_down['UP']:
@@ -246,9 +248,13 @@ try:
                 front_arm_position = FrontArmPosition.MINIMUM
 
 
-        print(front_arm_position)
         kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = back_arm_position
-        kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = front_arm_position
+
+        print(front_arm_position)
+        if buttons_down['A']:
+            kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = FrontArmPosition.SNAP_DOWN
+        else:
+            kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = front_arm_position
 
         if direction == Direction.FORWARD:
             GPIO.output(GPIO_Ain1, True)
