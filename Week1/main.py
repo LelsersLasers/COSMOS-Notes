@@ -108,8 +108,12 @@ pwmB = GPIO.PWM(GPIO_Bpwm, pwm_frequency)
 pwmA.start(0)
 pwmB.start(0)
 
+
 kit = adafruit_servokit.ServoKit(channels=16)
 
+
+gamepad = evdev.InputDevice("/dev/input/event0")
+print(gamepad)
 #------------------------------------------------------------------------------#
 def set_button_downpressed(button, code_button, value_button):
     if BUTTON_CODE_MAPPINGS[button] == code_button:
@@ -167,16 +171,6 @@ class Power:
     HIGH = 100
 #------------------------------------------------------------------------------#
 
-
-# TODO: By id?
-gamepad = evdev.InputDevice("/dev/input/event0")
-print(gamepad)
-print()
-
-
-# FSM1State = 0
-# FSM1NextState = 0
-
 direction = Direction.FORWARD
 power = Power.HIGH
 
@@ -195,8 +189,9 @@ print("Press CTRL+C to end the program.\n")
 
 try:
 
-    noError = True
-    while noError:
+    looping = True
+    while looping:
+
         t1 = time.time()
         delta = t1 - t0
         t0 = t1
@@ -232,6 +227,7 @@ try:
         power = Power.HIGH if buttons_down['Y'] else Power.LOW
 
 
+        # only trigger on downpress
         if new_button and value_button == 1:
             if code_button == BUTTON_CODE_MAPPINGS['X']:
                 back_arm_position = BackArmPosition.UP if back_arm_position == BackArmPosition.DOWN else BackArmPosition.DOWN

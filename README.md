@@ -1,6 +1,6 @@
 # COSMOS-Notes
 
-Personal notes for Cluster 10: Robot Inventors at COSMOS (UCSD)
+Personal notes/code/etc for Cluster 10: Robot Inventors at COSMOS (UCSD)
 
 ## Website link
 
