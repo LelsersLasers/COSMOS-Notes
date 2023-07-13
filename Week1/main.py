@@ -7,8 +7,8 @@
     - B: hold for straight backwards
     - Y: hold for high power
     - X: back arm posistion toggle
-    - A: snap arm to posistion
-    - Up/Down: change front arm posistion
+    - A: hold for snap front arm down
+    - Up/Down: change front arm resting posistion
 """
 
 # Libraries
@@ -139,15 +139,6 @@ def set_all_sticks_downpressed(code_stick, value_stick):
         set_stick_uppressed(stick, code_stick, value_stick)
 
 
-def close():
-    kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = BackArmPosition.UP
-    kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = FrontArmPosition.MAXIMUM
-
-    gamepad.close()
-    pwmA.stop()
-    pwmB.stop()
-    GPIO.cleanup()
-
 # ENUM, values aren't relevant
 class Direction:
     FORWARD = 0
@@ -155,15 +146,34 @@ class Direction:
 
 # in degrees
 class BackArmPosition:
-    UP = 45
-    DOWN = 225
+    UP = 180.0
+    DOWN = 15.0
+    DEGREES_PER_SECOND = 60.0
+
+class BackArmStatus:
+    UP = 0
+    DOWN = 1
+    MOVING_UP = 2
+    MOVING_DOWN = 3
+
+    @classmethod
+    def __str__(cls, back_arm_status):
+        if back_arm_status == cls.UP:
+            return "UP"
+        elif back_arm_status == cls.DOWN:
+            return "DOWN"
+        elif back_arm_status == cls.MOVING_UP:
+            return "MOVING_UP"
+        elif back_arm_status == cls.MOVING_DOWN:
+            return "MOVING_DOWN"
 
 # in degrees
 class FrontArmPosition:
-    SNAP_DOWN = 120.0
+    SNAP_DOWN = 180.0
     MINIMUM = 180.0
-    MAXIMUM = 0.0
-    DEGREES_PER_SECOND = 45.0
+    MAXIMUM = 45.0
+    DEGREES_PER_SECOND = 180.0
+    SNAP_DOWN_TIMER = 0.75
 
 # duty cycles
 class Power:
@@ -176,6 +186,10 @@ power = Power.HIGH
 
 back_arm_position = BackArmPosition.UP
 front_arm_position = FrontArmPosition.MAXIMUM
+
+front_arm_timer = 0.0
+
+back_arm_status = BackArmStatus.UP
 
 kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = back_arm_position
 kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = front_arm_position
@@ -195,6 +209,8 @@ try:
         t1 = time.time()
         delta = t1 - t0
         t0 = t1
+
+        front_arm_timer -= delta
 
         new_button = False
         new_stick = False
@@ -226,17 +242,13 @@ try:
         direction = Direction.BACKWARD if buttons_down['B'] else Direction.FORWARD
         power = Power.HIGH if buttons_down['Y'] else Power.LOW
 
-        # front_arm_position = FrontArmPosition.SNAP_DOWN if buttons_down['A'] else front_arm_position
-
-
         # only trigger on downpress
         if new_button and value_button == 1:
             if code_button == BUTTON_CODE_MAPPINGS['X']:
-                back_arm_position = BackArmPosition.UP if back_arm_position == BackArmPosition.DOWN else BackArmPosition.DOWN
-                kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = back_arm_position
-            # elif code_button == BUTTON_CODE_MAPPINGS['A']:
-            #     front_arm_position = FrontArmPosition.SNAP_DOWN
-
+                if back_arm_status == BackArmStatus.UP:
+                    back_arm_status = BackArmStatus.MOVING_DOWN
+                elif back_arm_status == BackArmStatus.DOWN:
+                    back_arm_status == BackArmStatus.MOVING_UP
 
         if sticks_down['UP']:
             front_arm_position -= FrontArmPosition.DEGREES_PER_SECOND * delta
@@ -247,11 +259,25 @@ try:
             if front_arm_position > FrontArmPosition.MINIMUM:
                 front_arm_position = FrontArmPosition.MINIMUM
 
+        if back_arm_status == BackArmStatus.MOVING_DOWN:
+            back_arm_position -= BackArmPosition.DEGREES_PER_SECOND * delta
+            if back_arm_position <= BackArmPosition.DOWN:
+                back_arm_position = BackArmPosition.DOWN
+                back_arm_status = BackArmStatus.DOWN
+        elif back_arm_status == BackArmStatus.MOVING_UP:
+            back_arm_position += BackArmPosition.DEGREES_PER_SECOND * delta
+            if back_arm_position >= BackArmPosition.UP:
+                back_arm_position = BackArmPosition.UP
+                back_arm_status = BackArmStatus.UP
+
+        print(BackArmStatus.__str__(back_arm_status))
 
         kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = back_arm_position
 
-        print(front_arm_position)
         if buttons_down['A']:
+            front_arm_timer = FrontArmPosition.SNAP_DOWN_TIMER
+
+        if front_arm_timer >= 0.0:
             kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = FrontArmPosition.SNAP_DOWN
         else:
             kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = front_arm_position
@@ -280,4 +306,29 @@ try:
 # Quit the program when the user presses CTRL + C
 except KeyboardInterrupt:
     print("Exiting...")
-    close()
+
+    try:
+        # TODO: time.sleep()s don't really work
+        while back_arm_position != BackArmPosition.UP:
+            back_arm_position += BackArmPosition.DEGREES_PER_SECOND / 4
+            if back_arm_position > BackArmPosition.UP:
+                back_arm_position = BackArmPosition.UP
+            kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = BackArmPosition.UP
+
+            time.sleep(0.5)
+        
+        time.sleep(2.0)
+
+        kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = FrontArmPosition.MAXIMUM
+    finally:
+        try:
+            kit.servo[SERVO_CHANNEL_MAPPINGS['BACK']].angle = BackArmPosition.UP
+            time.sleep(3.0)
+            kit.servo[SERVO_CHANNEL_MAPPINGS['FRONT']].angle = FrontArmPosition.MAXIMUM
+        finally:
+            gamepad.close()
+            pwmA.stop()
+            pwmB.stop()
+            GPIO.cleanup()
+
+            print("Done!")

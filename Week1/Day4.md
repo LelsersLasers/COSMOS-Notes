@@ -81,3 +81,6 @@ For week 2
 - Sum: `mat.sum()`
 	- Sum on axis: `mat.sum(axis=0)` => sum of each column
 		- `axis=1` => sum of each row
+- For pictures: format from openCV is BGR
+	- `[x, y, 0]` => blue
+	- `[x, y, 1]` => green
