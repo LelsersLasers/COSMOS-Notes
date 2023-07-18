@@ -185,9 +185,11 @@ try:
             # for color in COLOR_HUE_RANGES:
             for color in ["GREEN"]:
                 color_mask, _ = mask_image(image, image_hsv, color)
-                cnts = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cx, cy, cnts = center_of_mask(color_mask)
+                # cnts = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-                if len(cnts[0]) > 0:
+                cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
+                if cy is not None and cy >= cutoff:
                     print("Found color: " + color)
                     currentState = FSM.color_to_state(color)
                     break
