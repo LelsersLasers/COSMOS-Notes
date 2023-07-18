@@ -13,9 +13,6 @@ import time
 
 """
 TODO:
-- Improve color detection
-    - And use different SAT/VAL ranges per color
-- https://theailearner.com/2020/11/03/opencv-minimum-area-rectangle/
 Possible ideas:
 - Calibrate bottom cutoff
 - Calibrate color ranges
@@ -84,9 +81,9 @@ COLOR_HUE_RANGES = {
 }
 
 
-SCREEN_SIZE = [640, 480]
+# SCREEN_SIZE = [640, 480]
 FRAMERATE = 32
-# SCREEN_SIZE = [320, 240]
+SCREEN_SIZE = [480, 368]
 # FRAMERATE = 60
 
 BOTTOM_CUTOFF = 0.8
@@ -178,7 +175,7 @@ def mask_image(image, image_hsv, color):
     color_mask = cv2.inRange(image_hsv, lowerThreshold, upperThreshold)
     image_masked = cv2.bitwise_and(image, image, mask=color_mask)
 
-    cv2.imshow("Masked image", image_masked)
+    # cv2.imshow("Masked image", image_masked)
 
     return color_mask, image_masked
 
@@ -223,7 +220,7 @@ t0 = time.time()
 t1 = time.time()
 delta = 1 / 32
 
-MAX_SPEED = 100.0
+MAX_SPEED = 50.0
 SPIN_MOTOR_SPEED = 30.0
 BLIND_MOTOR_SPEED = 30.0
 MIN_VERTICAL_MODIFIER = 0.5
@@ -313,9 +310,6 @@ try:
 
                 cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
                 cv2.circle(image_masked, (cx, cy), 5, (255, 255, 255), -1)
-            # else:
-            #     left_speed = 0
-            #     right_speed = 0
 
 
             # cv2.imshow("Masked image", image_masked)
