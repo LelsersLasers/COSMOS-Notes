@@ -94,6 +94,8 @@ class FSM:
     LEFT = 4
     RIGHT = 5
 
+    # TODO:? calibrate bottom cutoff?
+
     @classmethod
     def color_to_state(cls, color):
         if color == "GREEN":
@@ -157,6 +159,10 @@ def center_of_mask(color_mask):
     
     return cx, cy, cnts
 
+t0 = time.time()
+t1 = time.time()
+delta = 1 / 32
+
 
 try:
     
@@ -165,28 +171,39 @@ try:
     print("Press CTRL+C to end the program.")
 
     for frame in camera.capture_continuous(rawframe, format="bgr", use_video_port=True):
+
+        t1 = time.time()
+        delta = t1 - t0
+        t0 = t1
+
+        fps = 1 / delta
+        print("FPS: %.2f\tDelta: %0.3f" % (fps, delta))
+
         image = frame.array
         image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        print("Current state: " + FSM.to_string(currentState))
+        print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
 
 
-        if currentState == FSM.START or currentState == FSM.LEFT or currentState == FSM.RIGHT:
-            if currentState == FSM.LEFT:
+        if currentState in [FSM.START, FSM.YELLOW, FSM.LEFT, FSM.RIGHT]:
+            if currentState == FSM.START:
+                left_speed = 0.0
+                right_speed = 0.0
+            elif currentState == FSM.YELLOW:
+                left_speed = 30.0
+                right_speed = 30.0
+            elif currentState == FSM.LEFT:
                 left_speed = 0.0
                 right_speed = 30.0
             elif currentState == FSM.RIGHT:
                 left_speed = 30.0
                 right_speed = 0.0
-            elif currentState == FSM.START:
-                left_speed = 0.0
-                right_speed = 0.0
 
+            # TODO
             # for color in COLOR_HUE_RANGES:
             for color in ["GREEN"]:
                 color_mask, _ = mask_image(image, image_hsv, color)
                 cx, cy, cnts = center_of_mask(color_mask)
-                # cnts = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
                 if cy is not None and cy >= cutoff:
@@ -233,6 +250,8 @@ try:
 
             cv2.line(image, start_point, end_point, (0, 255, 0), 2)
             cv2.line(image_masked, start_point, end_point, (0, 255, 0), 2)
+        else:
+            ...
 
 
         # pwmB.ChangeDutyCycle(left_speed)
