@@ -9,13 +9,11 @@ import time
 
 """
 TODO:
-- Calibrate bottom cutoff?
-- Calibrate/improve color thresholds?
-- Try to improve FPS
-    - Improve smoothness
-- Tweak speeds
-- Non-linear vertical modifier?
-- PID?
+- Better color detection
+    - Outline mask (!)
+    - Top cutoff to avoid detecting random objects (!)
+        - How much to cutoff?
+    - Denoise? (!)
 """
 
 # ------------------------------------------------------------------------------#
@@ -65,7 +63,7 @@ COLOR_HUE_RANGES = {
     #     "UPPER": [40, 255, 255],
     # },
     "PURPLE": { # and a little blue
-        "LOWER": [140, 35, 50],
+        "LOWER": [130, 35, 50],
         "UPPER": [155, 255, 255],
     },
     # "BLUE": {
@@ -76,12 +74,17 @@ COLOR_HUE_RANGES = {
 }
 
 
-SCREEN_SIZE = [640, 480]
-FRAMERATE = 32
+# SCREEN_SIZE = [640, 480]
+# FRAMERATE = 32
 # SCREEN_SIZE = [480, 368]
 # FRAMERATE = 60
+# SCREEN_SIZE = [600, 450]
+
+SCREEN_SIZE = [548, 411]
+FRAMERATE = 20
 
 BOTTOM_CUTOFF = 0.8
+TOP_CUTOFF = 0.45
 
 DISPLAY_DEBUG = True
 
@@ -108,8 +111,9 @@ State: start
 - State: purple
     - Track to purple while center is above the cutoff line
     - Then state = straight
+    - Note: purple ignores the lower cutoff line
 - State: left/right/straight
-    - Turn left/right/straight until another tag (above the cutoff) is detected
+    - Turn left/right/go straight until another tag (above the cutoff) is detected
 """
 class FSM:
     START = 0
@@ -166,6 +170,21 @@ def mask_image(image_hsv, color):
 
     return color_mask
 
+def denoise(image):
+    # return cv2.fastNlMeansDenoisingColored(image, None, 10, 10, 7, 21)
+    kernel = np.ones((5, 5), np.float32) / 25
+    dst = cv2.filter2D(image, -1, kernel)
+    return dst
+
+def outline_convolution(image):
+    edges = cv2.Canny(image, 100,200)
+    edges = cv2.bitwise_not(edges)
+
+    image = cv2.bitwise_and(image, image, mask=edges)
+
+    return image
+
+
 def center_of_mask(color_mask):
     cnts, _ = cv2.findContours(color_mask, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -181,19 +200,22 @@ def center_of_mask(color_mask):
     #         break
     # return cx, cy, cnts
 
-    boxes = (np.int0(cv2.boxPoints(cv2.minAreaRect(c))) for c in cnts)
+    boxes = [np.int0(cv2.boxPoints(cv2.minAreaRect(c))) for c in cnts]
+    valid_boxes = []
+    top_cutoff = SCREEN_SIZE[1] * TOP_CUTOFF
 
-    # Choose the box with the largest area
-    try:
-        max_box = max(boxes, key=cv2.contourArea)
-
-        # cx and cy are averages of the corners
+    for i in range(len(boxes)):
+        box = boxes[i]
+        y = box[:, 1]
+        if np.mean(y) > top_cutoff:
+            valid_boxes.append(box)
+    if len(valid_boxes) > 0:
+        max_box = max(valid_boxes, key=cv2.contourArea)
         cx = int(np.mean(max_box[:, 0]))
         cy = int(np.mean(max_box[:, 1]))
 
-        cnts = [max_box]
-    except ValueError: # max() arg is an empty sequence (boxes is empty)
-        pass
+        valid_boxes.remove(max_box)
+        cnts = [max_box] + valid_boxes
 
     return cx, cy, cnts
 
@@ -203,10 +225,10 @@ t1 = time.time()
 delta = 1 / 32
 
 
-MAX_SPEED = 30.0
+MAX_SPEED = 25.0
 SPIN_MOTOR_SPEED = 40.0
 STRAIGHT_MOTOR_SPEED = 40.0
-MIN_VERTICAL_MODIFIER = 0.4
+MIN_VERTICAL_MODIFIER = 0.5
 
 
 def vertical_modifier_linear(top_spacing, bottom_cutoff=BOTTOM_CUTOFF):
@@ -221,11 +243,17 @@ def vertical_modifier_exponential2(top_spacing, bottom_cutoff=BOTTOM_CUTOFF):
     global MIN_VERTICAL_MODIFIER
     return (MIN_VERTICAL_MODIFIER ** (1 / (bottom_cutoff - 0.5))) ** (top_spacing - 0.5)
 
+def clamp(n, smallest, largest): return max(smallest, min(n, largest))
+
+
+K_P = 1.0
+K_D = 0.2
+last_error = None
 
 try:
     
     print("Starting camera...")
-    time.sleep(2)
+    time.sleep(0.5)
     print("Press CTRL+C to end the program.")
 
     for frame in camera.capture_continuous(rawframe, format="bgr", use_video_port=True):
@@ -235,13 +263,14 @@ try:
         t0 = t1
 
         fps = 1 / delta
-        # print("FPS: %.2f\tDelta: %0.2f" % (fps, delta * 1000))
+        print("FPS: %.2f\tDelta: %0.2f" % (fps, delta * 1000))
 
         image = frame.array
-        # image = cv2.convertScaleAbs(image, alpha=1.5, beta=0)
+        image = denoise(image)
+        image = outline_convolution(image)
         image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
+        print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
 
 
         if currentState in [FSM.START, FSM.LEFT, FSM.RIGHT, FSM.STRAIGHT]:
@@ -258,20 +287,20 @@ try:
                 left_speed = STRAIGHT_MOTOR_SPEED
                 right_speed = STRAIGHT_MOTOR_SPEED
 
-            # for color in COLOR_HUE_RANGES:
             for color in ["GREEN", "PINK", "PURPLE"]:
                 color_mask = mask_image(image_hsv, color)
                 cx, cy, cnts = center_of_mask(color_mask)
 
                 cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
-                if cx is not None and cy is not None and color == "PURPLE":
-                    currentState = FSM.PURPLE
-                    MAX_SPEED = min(MAX_SPEED, 50.0)
-                elif cy is not None and cy <= cutoff:
-                    # print("Found color: " + color)
-                    currentState = FSM.color_to_state(color)
-                    MAX_SPEED = min(MAX_SPEED, 50.0)
-                    break
+                if cy is not None:
+                    if color == "PURPLE":
+                        currentState = FSM.PURPLE
+                        MAX_SPEED = min(MAX_SPEED, 50.0)
+                        break
+                    elif cy <= cutoff:
+                        currentState = FSM.color_to_state(color)
+                        MAX_SPEED = min(MAX_SPEED, 50.0)
+                        break
         elif currentState in [FSM.GREEN, FSM.PINK, FSM.PURPLE]:
             color = FSM.state_to_color(currentState)
             color_mask = mask_image(image_hsv, color)
@@ -281,17 +310,29 @@ try:
             cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
             if currentState == FSM.PURPLE and cy is None:
                 currentState = FSM.STRAIGHT
-            elif cy is not None and cy > cutoff:
+            elif cy is not None and cy > cutoff and currentState != FSM.PURPLE:
                 if currentState == FSM.GREEN:
                     currentState = FSM.LEFT
                 elif currentState == FSM.PINK:
                     currentState = FSM.RIGHT
             elif cx is not None and cy is not None:
-                MAX_SPEED += delta * 25
+                MAX_SPEED += delta * 50
                 MAX_SPEED = min(100.0, MAX_SPEED)
 
-                left_spacing = cx / SCREEN_SIZE[0]
-                right_spacing = 1 - left_spacing
+                # left_spacing = cx / SCREEN_SIZE[0]
+
+                error = cx / SCREEN_SIZE[0] - 0.5
+                if last_error is not None:
+                    d_error = (error - last_error) / delta
+                else:
+                    d_error = 0.0
+                last_error = error
+
+                total_error = K_P * error + K_D * d_error
+
+                left_spacing = total_error + 0.5
+                right_spacing = 1.0 - left_spacing
+
 
                 top_spacing = cy / SCREEN_SIZE[1]
                 bottom_cutoff = 1.0 if currentState == FSM.PURPLE else BOTTOM_CUTOFF
@@ -304,27 +345,29 @@ try:
                 left_spacing /= max_spacing
                 right_spacing /= max_spacing
 
-                left_speed = left_spacing * MAX_SPEED * vertical_modifier
-                right_speed = right_spacing * MAX_SPEED * vertical_modifier
+                left_speed = clamp(left_spacing * MAX_SPEED * vertical_modifier, 0.0, 100.0)
+                right_speed = clamp(right_spacing * MAX_SPEED * vertical_modifier, 0.0, 100.0)
 
                 if DISPLAY_DEBUG:
-                    cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
+                    # vertical line at x=cx
+                    start_point = (cx, 0)
+                    end_point = (cx, SCREEN_SIZE[1])
+                    cv2.line(image, start_point, end_point, (255, 0, 0), 2)
 
+                    # horizontal line at y=cy showing total_error
+                    start_point = (int(SCREEN_SIZE[0] / 2), cy)
+                    end_point = (int(SCREEN_SIZE[0] * (total_error + 0.5)), cy)
+                    cv2.line(image, start_point, end_point, (255, 255, 0), 2)
+                    
 
             if DISPLAY_DEBUG:
-                cv2.drawContours(image, cnts, -1, (255, 0, 0), 2)
-                if cx is not None and cy is not None:
-                    cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
+                if len(cnts) > 0:
+                    # draw the first contour in blue, rest in orange
+                    cv2.drawContours(image, cnts, 0, (255, 0, 0), 2)
+                    cv2.drawContours(image, cnts[1:], -1, (0, 165, 255), 2)
+                    if cx is not None and cy is not None:
+                        cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
 
-                # cutoff line
-                start_point = (0, int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
-                end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
-                cv2.line(image, start_point, end_point, (0, 255, 0), 2)
-
-                # vertical center line
-                start_point = (int(SCREEN_SIZE[0] / 2), 0)
-                end_point = (int(SCREEN_SIZE[0] / 2), SCREEN_SIZE[1])
-                cv2.line(image, start_point, end_point, (0, 0, 255), 2)
         else:
             ...
 
@@ -333,11 +376,24 @@ try:
         pwmA.ChangeDutyCycle(right_speed)
 
         if DISPLAY_DEBUG:
+            # Cutoff line
+            start_point = (0, int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
+            end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
+            cv2.line(image, start_point, end_point, (0, 255, 0), 2)
+
+            # Top cutoff line
+            start_point = (0, int(SCREEN_SIZE[1] * TOP_CUTOFF))
+            end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * TOP_CUTOFF))
+            cv2.line(image, start_point, end_point, (255, 0, 255), 2)
+
+            # Vertical center line
+            start_point = (int(SCREEN_SIZE[0] / 2), 0)
+            end_point = (int(SCREEN_SIZE[0] / 2), SCREEN_SIZE[1])
+            cv2.line(image, start_point, end_point, (0, 0, 255), 2)
+
+
             cv2.imshow("Frame in BGR", image)
             cv2.waitKey(1)
-
-            # if currentState == FSM.PURPLE:
-            #     time.sleep(10)
         
         rawframe.truncate(0)
 
