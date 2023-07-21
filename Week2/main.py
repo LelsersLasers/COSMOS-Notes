@@ -80,13 +80,13 @@ COLOR_HUE_RANGES = {
 # FRAMERATE = 60
 # SCREEN_SIZE = [600, 450]
 
-SCREEN_SIZE = [548, 411]
+SCREEN_SIZE = [560, 416]
 FRAMERATE = 20
 
 BOTTOM_CUTOFF = 0.8
 TOP_CUTOFF = 0.45
 
-DISPLAY_DEBUG = True
+DISPLAY_DEBUG = False
 
 
 # Initialize the camera and grab a reference to the frame
@@ -214,8 +214,7 @@ def center_of_mask(color_mask):
         cx = int(np.mean(max_box[:, 0]))
         cy = int(np.mean(max_box[:, 1]))
 
-        valid_boxes.remove(max_box)
-        cnts = [max_box] + valid_boxes
+        cnts = [max_box]
 
     return cx, cy, cnts
 
@@ -263,14 +262,14 @@ try:
         t0 = t1
 
         fps = 1 / delta
-        print("FPS: %.2f\tDelta: %0.2f" % (fps, delta * 1000))
+        # print("FPS: %.2f\tDelta: %0.2f" % (fps, delta * 1000))
 
         image = frame.array
         image = denoise(image)
         image = outline_convolution(image)
         image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
+        # print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
 
 
         if currentState in [FSM.START, FSM.LEFT, FSM.RIGHT, FSM.STRAIGHT]:
@@ -361,12 +360,9 @@ try:
                     
 
             if DISPLAY_DEBUG:
-                if len(cnts) > 0:
-                    # draw the first contour in blue, rest in orange
-                    cv2.drawContours(image, cnts, 0, (255, 0, 0), 2)
-                    cv2.drawContours(image, cnts[1:], -1, (0, 165, 255), 2)
-                    if cx is not None and cy is not None:
-                        cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
+                cv2.drawContours(image, cnts, -1, (255, 0, 0), 2)
+                if cx is not None and cy is not None:
+                    cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
 
         else:
             ...
