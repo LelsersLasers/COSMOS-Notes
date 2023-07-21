@@ -7,11 +7,6 @@ import RPi.GPIO as GPIO
 
 import time
 
-MAX_SPEED = 25.0
-SPIN_MOTOR_SPEED = 30.0
-STRAIGHT_MOTOR_SPEED = 50.0
-MIN_VERTICAL_MODIFIER = 0.5
-
 SCREEN_SIZE = [560, 416]
 FRAMERATE = 20
 # SCREEN_SIZE = [640, 480]
@@ -19,13 +14,15 @@ FRAMERATE = 20
 # SCREEN_SIZE = [480, 368]
 # FRAMERATE = 60
 
+SPEED = 50.0
+
 BOTTOM_CUTOFF = 0.8
 TOP_CUTOFF = 0.45
 
 DISPLAY_DEBUG = True
 
-K_P = 1.0
-K_D = 0.1
+K_P = 0.7
+K_D = 0.05
 last_error = None
 
 # ------------------------------------------------------------------------------#
@@ -256,94 +253,62 @@ try:
         image = outline_convolution(image)
         image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # print("Current state: " + FSM.to_string(currentState), left_speed, right_speed)
+        results = []
 
-
-        if currentState in [FSM.START, FSM.LEFT, FSM.RIGHT, FSM.STRAIGHT]:
-            if currentState == FSM.START:
-                left_speed = 0.0
-                right_speed = 0.0
-            elif currentState == FSM.LEFT:
-                left_speed = 0.0
-                right_speed = SPIN_MOTOR_SPEED
-            elif currentState == FSM.RIGHT:
-                left_speed = SPIN_MOTOR_SPEED
-                right_speed = 0.0
-            elif currentState == FSM.STRAIGHT:
-                left_speed = STRAIGHT_MOTOR_SPEED
-                right_speed = STRAIGHT_MOTOR_SPEED
-
-            for color in ["GREEN", "PINK", "PURPLE"]:
-                color_mask = mask_image(image_hsv, color)
-                cx, cy, cnts = center_of_mask(color_mask)
-
-                cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
-                if cy is not None:
-                    if color == "PURPLE":
-                        currentState = FSM.PURPLE
-                        MAX_SPEED = min(MAX_SPEED, 50.0)
-                        break
-                    elif cy <= cutoff:
-                        currentState = FSM.color_to_state(color)
-                        MAX_SPEED = min(MAX_SPEED, 50.0)
-                        break
-        elif currentState in [FSM.GREEN, FSM.PINK, FSM.PURPLE]:
-            color = FSM.state_to_color(currentState)
+        for color in ["GREEN", "PINK", "PURPLE"]:
             color_mask = mask_image(image_hsv, color)
 
-            cx, cy, cnts = center_of_mask(color_mask)
+            results.append(center_of_mask(color_mask))
+        
+        cx = None
+        cy = None
+        cnts = None
 
-            cutoff = SCREEN_SIZE[1] * BOTTOM_CUTOFF
-            if currentState == FSM.PURPLE and cy is None:
-                currentState = FSM.STRAIGHT
-            elif cy is not None and cy > cutoff and currentState != FSM.PURPLE:
-                if currentState == FSM.GREEN:
-                    currentState = FSM.LEFT
-                elif currentState == FSM.PINK:
-                    currentState = FSM.RIGHT
-            elif cx is not None and cy is not None:
-                MAX_SPEED += delta * 50
-                MAX_SPEED = min(100.0, MAX_SPEED)
+        results = [r for r in results if r[0] is not None and r[1] is not None]
+        if len(results) > 0:
+            # furthest away
+            cx, cy, cnts = max(results, key=lambda x: x[1])
 
-                # left_spacing = cx / SCREEN_SIZE[0]
+            GPIO.output(GPIO_Ain1, False)
+            GPIO.output(GPIO_Ain2, True)
+            GPIO.output(GPIO_Bin1, False)
+            GPIO.output(GPIO_Bin2, True)
 
-                error = cx / SCREEN_SIZE[0] - 0.5
-                if last_error is not None:
-                    d_error = (error - last_error) / delta
-                else:
-                    d_error = 0.0
-                last_error = error
+            error = cx / SCREEN_SIZE[0] - 0.5
+            if last_error is not None:
+                d_error = (error - last_error) / delta
+            else:
+                d_error = 0.0
+            last_error = error
 
-                total_error = K_P * error + K_D * d_error
+            total_error = K_P * error + K_D * d_error
 
-                left_spacing = total_error + 0.5
-                right_spacing = 1.0 - left_spacing
+            left_spacing = total_error + 0.5
+            right_spacing = 1.0 - left_spacing
 
 
-                top_spacing = cy / SCREEN_SIZE[1]
-                bottom_cutoff = 1.0 if currentState == FSM.PURPLE else BOTTOM_CUTOFF
-                vertical_modifier = vertical_modifier_linear(top_spacing, bottom_cutoff)
-                vertical_modifier = min(1.0, vertical_modifier)
+            top_spacing = cy / SCREEN_SIZE[1]
+            bottom_cutoff = 1.0 if currentState == FSM.PURPLE else BOTTOM_CUTOFF
 
-                # print("Vertical modifier: %.2f" % vertical_modifier)
+            # print("Vertical modifier: %.2f" % vertical_modifier)
 
-                max_spacing = max(left_spacing, right_spacing)
-                left_spacing /= max_spacing
-                right_spacing /= max_spacing
+            max_spacing = max(left_spacing, right_spacing)
+            left_spacing /= max_spacing
+            right_spacing /= max_spacing
 
-                left_speed = clamp(left_spacing * MAX_SPEED * vertical_modifier, 0.0, 100.0)
-                right_speed = clamp(right_spacing * MAX_SPEED * vertical_modifier, 0.0, 100.0)
+            left_speed = clamp(left_spacing * SPEED, 0.0, 100.0)
+            right_speed = clamp(right_spacing * SPEED, 0.0, 100.0)
 
-                if DISPLAY_DEBUG:
-                    # vertical line at x=cx
-                    start_point = (cx, 0)
-                    end_point = (cx, SCREEN_SIZE[1])
-                    cv2.line(image, start_point, end_point, (255, 0, 0), 2)
+            if DISPLAY_DEBUG:
+                # vertical line at x=cx
+                start_point = (cx, 0)
+                end_point = (cx, SCREEN_SIZE[1])
+                cv2.line(image, start_point, end_point, (255, 0, 0), 2)
 
-                    # horizontal line at y=cy showing total_error
-                    start_point = (int(SCREEN_SIZE[0] / 2), cy)
-                    end_point = (int(SCREEN_SIZE[0] * (total_error + 0.5)), cy)
-                    cv2.line(image, start_point, end_point, (255, 255, 0), 2)
+                # horizontal line at y=cy showing total_error
+                start_point = (int(SCREEN_SIZE[0] / 2), cy)
+                end_point = (int(SCREEN_SIZE[0] * (total_error + 0.5)), cy)
+                cv2.line(image, start_point, end_point, (255, 255, 0), 2)
                     
 
             if DISPLAY_DEBUG:
@@ -352,23 +317,19 @@ try:
                     cv2.circle(image, (cx, cy), 5, (255, 255, 255), -1)
 
         else:
-            ...
+            GPIO.output(GPIO_Ain1, False)
+            GPIO.output(GPIO_Ain2, True)
+            GPIO.output(GPIO_Bin1, False)
+            GPIO.output(GPIO_Bin2, True)
+
+            left_speed = 40.0
+            right_speed = 40.0
 
         # Motors
         pwmB.ChangeDutyCycle(left_speed)
         pwmA.ChangeDutyCycle(right_speed)
 
         if DISPLAY_DEBUG:
-            # Cutoff line
-            start_point = (0, int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
-            end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * BOTTOM_CUTOFF))
-            cv2.line(image, start_point, end_point, (0, 255, 0), 2)
-
-            # Top cutoff line
-            start_point = (0, int(SCREEN_SIZE[1] * TOP_CUTOFF))
-            end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * TOP_CUTOFF))
-            cv2.line(image, start_point, end_point, (255, 0, 255), 2)
-
             # Vertical center line
             start_point = (int(SCREEN_SIZE[0] / 2), 0)
             end_point = (int(SCREEN_SIZE[0] / 2), SCREEN_SIZE[1])
