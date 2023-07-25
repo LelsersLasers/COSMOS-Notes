@@ -9,6 +9,10 @@ kit = adafruit_servokit.ServoKit(channels=16)
 gamepad = evdev.InputDevice("/dev/input/event0")
 print(gamepad)
 
+"""
+TODO:
+- Non blocking
+"""
 
 
 #------------------------------------------------------------------------------#
@@ -30,20 +34,22 @@ SERVO_REST_ANGLES = {
 }
 
 SERVO_PADDLE_ANGLES = {
-    'LEFT_SHOULDER': 110,
-    'RIGHT_SHOULDER': 60,
-    'LEFT_ELBOW': 180,
-    'RIGHT_ELBOW': 0,
+    'LEFT_SHOULDER': 97,
+    'RIGHT_SHOULDER': 75,
+    'LEFT_ELBOW': 90,
+    'RIGHT_ELBOW': 90,
 }
 
-SHOULDER_DELAY = 0.5
-ELBOW_DELAY = 0.5
+SHOULDER_DELAY = 1.0
+ELBOW_DELAY = 1.0
 
 def set_servo_posistions(positions):
     global kit, SERVO_SHOULDERS, SERVO_ELBOWS, SERVO_CHANNEL_MAPPINGS
+    
     for servo in SERVO_SHOULDERS:
         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
     time.sleep(SHOULDER_DELAY)
+
     for servo in SERVO_ELBOWS:
         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
     time.sleep(ELBOW_DELAY)
@@ -193,10 +199,10 @@ try:
         #----------------------------------------------------------------------#
 
         #----------------------------------------------------------------------#
-        if currentState == FSM.PADDLE:
-            reset_servo_posistions()
-        elif currentState == FSM.PADDLE:
+        if currentState == FSM.RESET:
             paddle_servo_posistions()
+        elif currentState == FSM.PADDLE:
+            reset_servo_posistions()
         currentState = FSM.get_next_state(currentState)
         #----------------------------------------------------------------------#
 except:
