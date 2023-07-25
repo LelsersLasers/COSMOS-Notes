@@ -11,54 +11,80 @@ print(gamepad)
 
 """
 TODO:
-- Non blocking
+- Tweak the angles
+    - For the overall
+    - And for differences in left/right due to mounting and servo differences
+- Test with controller
+- Frictionless back
+- Strength/durability/reliability
+- Speed
 """
 
 
 #------------------------------------------------------------------------------#
-SERVO_SHOULDERS = ['LEFT_SHOULDER', 'RIGHT_SHOULDER']
-SERVO_ELBOWS = ['LEFT_ELBOW', 'RIGHT_ELBOW']
+# SERVO_SHOULDERS = ['LEFT_SHOULDER', 'RIGHT_SHOULDER']
+# SERVO_ELBOWS = ['LEFT_ELBOW', 'RIGHT_ELBOW']
 
 SERVO_CHANNEL_MAPPINGS = {
-    'LEFT_SHOULDER': 0,
-    'RIGHT_SHOULDER': 1,
-    'LEFT_ELBOW': 2,
-    'RIGHT_ELBOW': 3,
+    'LEFT': {
+        'SHOULDER': 0,
+        'ELBOW': 2,
+    },
+    'RIGHT': {
+        'SHOULDER': 1,
+        'ELBOW': 3,
+    }
 }
 
 SERVO_REST_ANGLES = {
-    'LEFT_SHOULDER': 180,
-    'RIGHT_SHOULDER': 0,
-    'LEFT_ELBOW': 180,
-    'RIGHT_ELBOW': 0,
+    'LEFT': {
+        'SHOULDER': 180,
+        'ELBOW': 180,
+    },
+    'RIGHT': {
+        'SHOULDER': 0,
+        'ELBOW': 0,
+    }
 }
 
 SERVO_PADDLE_ANGLES = {
-    'LEFT_SHOULDER': 97,
-    'RIGHT_SHOULDER': 75,
-    'LEFT_ELBOW': 90,
-    'RIGHT_ELBOW': 90,
+    'LEFT': {
+        'SHOULDER': 80,
+        'ELBOW': 30,
+    },
+    'RIGHT': {
+        'SHOULDER': 80,
+        'ELBOW': 150,
+    }
 }
 
 SHOULDER_DELAY = 1.0
 ELBOW_DELAY = 1.0
 
-def set_servo_posistions(positions):
-    global kit, SERVO_SHOULDERS, SERVO_ELBOWS, SERVO_CHANNEL_MAPPINGS
+# To paddle: shoulder down, arm back, shoulder up, arm reset
+
+def set_servo_posistion(side, joint, positions):
+    global kit, SERVO_CHANNEL_MAPPINGS
+    channel = SERVO_CHANNEL_MAPPINGS[side][joint]
+    angle = positions[side][joint]
+    kit.servo[channel].angle = angle
+
+# def set_servo_posistions(positions):
+#     global kit, SERVO_SHOULDERS, SERVO_ELBOWS, SERVO_CHANNEL_MAPPINGS
     
-    for servo in SERVO_SHOULDERS:
-        kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
-    time.sleep(SHOULDER_DELAY)
+#     for servo in SERVO_SHOULDERS:
+#         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
+#     time.sleep(SHOULDER_DELAY)
 
-    for servo in SERVO_ELBOWS:
-        kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
-    time.sleep(ELBOW_DELAY)
+#     for servo in SERVO_ELBOWS:
+#         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
+#     time.sleep(ELBOW_DELAY)
 
-def reset_servo_posistions():
-    set_servo_posistions(SERVO_REST_ANGLES)
+# def reset_servo_posistions():
+#     set_servo_posistions(SERVO_REST_ANGLES)
 
-def paddle_servo_posistions():
-    set_servo_posistions(SERVO_PADDLE_ANGLES)
+# def paddle_servo_posistions():
+#     set_servo_posistions(SERVO_PADDLE_ANGLES)
 #------------------------------------------------------------------------------#
 
 
@@ -129,6 +155,75 @@ def set_all_sticks_downpressed(code_stick, value_stick):
 
 
 #------------------------------------------------------------------------------#
+class ArmFSM:
+    RESET = 0 # fully up
+    SHOULDER_RESETTING = 1 # shoulder is moving to reset position
+    ELBOW_RESETTING = 2 # elbow is moving to reset position
+
+    PADDLE = 3 # fully down
+    SHOULDER_PADDLING = 4 # shoulder is moving to paddle position
+    ELBOW_PADDLING = 5 # elbow is moving to paddle position
+
+    def __init__(self, side):
+        self.current_state = self.RESET
+        self.time_in_state = 0.0
+        self.side = side
+
+    def next_state(self, delta, fire):
+        self.time_in_state += delta
+        if self.current_state == ArmFSM.SHOULDER_RESETTING:
+            if self.time_in_state > SHOULDER_DELAY:
+                self.current_state = ArmFSM.ELBOW_RESETTING
+                self.time_in_state = 0.0
+                set_servo_posistion(self.side, 'ELBOW', SERVO_REST_ANGLES)
+        elif self.current_state == ArmFSM.ELBOW_RESETTING:
+            if self.time_in_state > ELBOW_DELAY:
+                self.current_state = ArmFSM.RESET
+                self.time_in_state = 0.0
+        elif self.current_state == ArmFSM.SHOULDER_PADDLING:
+            if self.time_in_state > SHOULDER_DELAY:
+                self.current_state = ArmFSM.ELBOW_PADDLING
+                self.time_in_state = 0.0
+                set_servo_posistion(self.side, 'ELBOW', SERVO_PADDLE_ANGLES)
+        elif self.current_state == ArmFSM.ELBOW_PADDLING:
+            if self.time_in_state > ELBOW_DELAY:
+                self.current_state = ArmFSM.PADDLE
+                self.time_in_state = 0.0
+        elif self.current_state == ArmFSM.RESET:
+            if fire:
+                self.current_state = ArmFSM.SHOULDER_PADDLING
+                self.time_in_state = 0.0
+                set_servo_posistion(self.side, 'SHOULDER', SERVO_PADDLE_ANGLES)
+        elif self.current_state == ArmFSM.PADDLE:
+            if fire:
+                self.current_state = ArmFSM.SHOULDER_RESETTING
+                self.time_in_state = 0.0
+                set_servo_posistion(self.side, 'SHOULDER', SERVO_REST_ANGLES)
+
+        
+def reset(left_state, right_state):
+    left_state.current_state = ArmFSM.PADDLE
+    right_state.current_state = ArmFSM.PADDLE
+
+    left_state.next_state(0.0, True)
+    right_state.next_state(0.0, True)
+
+    left_state.time_in_state = 0.0
+    right_state.time_in_state = 0.0
+
+    t0 = time.time()
+    t1 = time.time()
+    delta = 1 / 100
+
+    while left_state.current_state != ArmFSM.RESET or right_state.current_state != ArmFSM.RESET:
+        t1 = time.time()
+        delta = t1 - t0
+        t0 = t1
+
+        left_state.next_state(delta, False)
+        right_state.next_state(delta, False)
+    
+
 class FSM:
     RESET = 0
     PADDLE = 1
@@ -147,11 +242,15 @@ class FSM:
         elif state == cls.PADDLE:
             return 'PADDLE'
 
-currentState = FSM.RESET    
+# currentState = FSM.RESET
+left_state = ArmFSM('LEFT')
+right_state = ArmFSM('RIGHT')
+
+reset(left_state, right_state)
 #------------------------------------------------------------------------------#
 
 print("Starting...")
-reset_servo_posistions()
+# reset_servo_posistions()
 print("Ready!")
 
 t0 = time.time()
@@ -199,17 +298,24 @@ try:
         #----------------------------------------------------------------------#
 
         #----------------------------------------------------------------------#
-        if currentState == FSM.RESET:
-            paddle_servo_posistions()
-        elif currentState == FSM.PADDLE:
-            reset_servo_posistions()
-        currentState = FSM.get_next_state(currentState)
+        left_state.next_state(delta, True)
+        right_state.next_state(delta, True)
+
+        # left_state.next_state(delta, !buttons_down['RB'])
+        # right_state.next_state(delta, !buttons_down['LB'])
         #----------------------------------------------------------------------#
 except:
     ...
 finally:
     print("Exiting...")
-    reset_servo_posistions()
+    try:
+        reset(left_state, right_state)
+    except:
+        ...
+    finally:
+        for side in SERVO_CHANNEL_MAPPINGS:
+            for joint in SERVO_CHANNEL_MAPPINGS[side]:
+                set_servo_posistion(side, joint, SERVO_REST_ANGLES)
 
     GPIO.cleanup()
     gamepad.close()
