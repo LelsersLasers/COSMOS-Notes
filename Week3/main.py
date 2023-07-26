@@ -11,6 +11,8 @@ print(f"Gamepad: {gamepad}")
 
 """
 TODO:
+- Actually go forward
+    - Grippers on the top of the paddles
 - Tweak the angles
     - For the overall
     - And for differences in left/right due to mounting and servo differences
@@ -40,28 +42,28 @@ SERVO_CHANNEL_MAPPINGS = {
 
 SERVO_REST_ANGLES = {
     'LEFT': {
-        'SHOULDER': 180,
+        'SHOULDER': 150,
         'ELBOW': 0,
     },
     'RIGHT': {
-        'SHOULDER': 0,
+        'SHOULDER': 30,
         'ELBOW': 180,
     }
 }
 
 SERVO_PADDLE_ANGLES = {
     'LEFT': {
-        'SHOULDER': 85,
+        'SHOULDER': 65,
         'ELBOW': 180,
     },
     'RIGHT': {
-        'SHOULDER': 85,
+        'SHOULDER': 115,
         'ELBOW': 0,
     }
 }
 
-SHOULDER_DELAY = 1.0
-ELBOW_DELAY = 1.0
+SHOULDER_DELAY = 0.45
+ELBOW_DELAY = 0.75
 
 # To paddle: shoulder down, arm back, shoulder up, arm reset
 
@@ -71,23 +73,6 @@ def set_servo_posistion(side, joint, positions):
     angle = positions[side][joint]
     kit.servo[channel].angle = angle
     # print(f"Set {side} {joint} ({channel}) to {angle} degrees")
-
-# def set_servo_posistions(positions):
-#     global kit, SERVO_SHOULDERS, SERVO_ELBOWS, SERVO_CHANNEL_MAPPINGS
-    
-#     for servo in SERVO_SHOULDERS:
-#         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
-#     time.sleep(SHOULDER_DELAY)
-
-#     for servo in SERVO_ELBOWS:
-#         kit.servo[SERVO_CHANNEL_MAPPINGS[servo]].angle = positions[servo]
-#     time.sleep(ELBOW_DELAY)
-
-# def reset_servo_posistions():
-#     set_servo_posistions(SERVO_REST_ANGLES)
-
-# def paddle_servo_posistions():
-#     set_servo_posistions(SERVO_PADDLE_ANGLES)
 #------------------------------------------------------------------------------#
 
 
@@ -196,36 +181,46 @@ class ArmFSM:
             if fire:
                 self.current_state = ArmFSM.SHOULDER_PADDLING
                 self.time_in_state = 0.0
-                # time.sleep(ELBOW_DELAY)
                 set_servo_posistion(self.side, 'SHOULDER', SERVO_PADDLE_ANGLES)
         elif self.current_state == ArmFSM.PADDLE:
-            if fire:
-                self.current_state = ArmFSM.SHOULDER_RESETTING
-                self.time_in_state = 0.0
-                # time.sleep(ELBOW_DELAY)
-                set_servo_posistion(self.side, 'SHOULDER', SERVO_REST_ANGLES)
+            self.current_state = ArmFSM.SHOULDER_RESETTING
+            self.time_in_state = 0.0
+            set_servo_posistion(self.side, 'SHOULDER', SERVO_REST_ANGLES)
 
     @classmethod
-    def reset(cls, left_state, right_state):
+    def reset(cls, left_state = None, right_state = None):
         print("Fully resetting...")
-        left_state.current_state = cls.PADDLE
-        right_state.current_state = cls.PADDLE
-
-        left_state.next_state(0.0, True)
-        right_state.next_state(0.0, True)
+        if left_state is not None:
+            left_state.current_state = cls.PADDLE
+            left_state.next_state(0.0, False)
+        if right_state is not None:
+            right_state.current_state = cls.PADDLE
+            right_state.next_state(0.0, False)
 
         t0 = time.time()
         t1 = time.time()
         delta = 1 / 100
 
-        while left_state.current_state != cls.RESET or right_state.current_state != cls.RESET:
+        going = True
+        while going:
+            
             t1 = time.time()
             delta = t1 - t0
             t0 = t1
 
-            left_state.next_state(delta, False)
-            right_state.next_state(delta, False)
+            if delta < 0.05:
+                time.sleep(0.05 - delta)
+                delta = 0.05
+
+            if left_state is not None:
+                left_state.next_state(delta, False)
+            if right_state is not None:
+                right_state.next_state(delta, False)
+            
+            going = not ((left_state is None or left_state.current_state != cls.RESET) and (right_state is None or right_state.current_state != cls.RESET))
+
         print("Fully reset")
+
 
 class LeftRightFSM:
     LEFT_FIRST = 0
@@ -239,27 +234,8 @@ class LeftRightFSM:
             self.current_state = self.RIGHT_FIRST
         elif self.current_state == self.RIGHT_FIRST:
             self.current_state = self.LEFT_FIRST
-    
 
-class FSM:
-    RESET = 0
-    PADDLE = 1
 
-    @classmethod
-    def get_next_state(cls, current_state):
-        if current_state == cls.RESET:
-            return cls.PADDLE
-        elif current_state == cls.PADDLE:
-            return cls.RESET
-    
-    @classmethod
-    def get_state_name(cls, state):
-        if state == cls.RESET:
-            return 'RESET'
-        elif state == cls.PADDLE:
-            return 'PADDLE'
-
-# currentState = FSM.RESET
 left_state = ArmFSM('LEFT')
 right_state = ArmFSM('RIGHT')
 
@@ -291,9 +267,6 @@ try:
         new_stick = False
 
         try:
-            # for event in gamepad.read():  
-            # Use this option (and comment out the next line) to react to the latest event only
-            # Use this option (and comment out the previous line) when you don't want to miss any event
             event = gamepad.read_one()
 
             eventinfo = evdev.categorize(event)
@@ -318,33 +291,42 @@ try:
         if buttons_down['B']:
             ArmFSM.reset(left_state, right_state)
         else:
-            right_state.next_state(delta, True)
-            left_state.next_state(delta, True)
+            print(buttons_down['RB'], buttons_down['LB'])
+            if buttons_down['RB'] and not buttons_down['LB']:
+                left_state.next_state(delta, True)
+                right_state.next_state(delta, False)
+            elif buttons_down['LB'] and not buttons_down['RB']:
+                right_state.next_state(delta, True)
+                left_state.next_state(delta, False)
+            else:
+                if left_state.current_state == ArmFSM.RESET and right_state.current_state == ArmFSM.RESET:
+                    left_right_state.next_state()
 
-            # left_right_state.next_state()
-
-            # if left_right_state.current_state == LeftRightFSM.LEFT_FIRST:
-            #     left_state.next_state(delta, True)
-            #     right_state.next_state(delta, True)
-            # elif left_right_state.current_state == LeftRightFSM.RIGHT_FIRST:
-            #     right_state.next_state(delta, True)
-            #     left_state.next_state(delta, True)
-
-        # left_state.next_state(delta, !buttons_down['RB'])
-        # right_state.next_state(delta, !buttons_down['LB'])
+                    if left_right_state.current_state == LeftRightFSM.LEFT_FIRST:
+                        left_state.next_state(delta, True)
+                        right_state.next_state(delta, True)
+                    elif left_right_state.current_state == LeftRightFSM.RIGHT_FIRST:
+                        right_state.next_state(delta, True)
+                        left_state.next_state(delta, True)
+                else:
+                    if left_right_state.current_state == LeftRightFSM.LEFT_FIRST:
+                        left_state.next_state(delta, False)
+                        right_state.next_state(delta, False)
+                    elif left_right_state.current_state == LeftRightFSM.RIGHT_FIRST:
+                        right_state.next_state(delta, False)
+                        left_state.next_state(delta, False)
         #----------------------------------------------------------------------#
 except:
     ...
 finally:
     print("Exiting...")
+
     try:
         ArmFSM.reset(left_state, right_state)
     except:
-        ...
-    finally:
         for side in SERVO_CHANNEL_MAPPINGS:
             for joint in SERVO_CHANNEL_MAPPINGS[side]:
-                set_servo_posistion(side, joint, SERVO_REST_ANGLES)
+                set_servo_posistion(side, joint, SERVO_REST_ANGLES)        
 
     GPIO.cleanup()
     gamepad.close()
