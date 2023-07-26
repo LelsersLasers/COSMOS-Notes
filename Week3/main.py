@@ -7,7 +7,7 @@ import time
 kit = adafruit_servokit.ServoKit(channels=16)
 
 gamepad = evdev.InputDevice("/dev/input/event0")
-print(gamepad)
+print(f"Gamepad: {gamepad}")
 
 """
 TODO:
@@ -16,6 +16,8 @@ TODO:
     - And for differences in left/right due to mounting and servo differences
 - Test with controller
 - Frictionless back
+    - Use bar instead of circle
+- Foam under the front
 - Strength/durability/reliability
 - Speed
 """
@@ -28,10 +30,10 @@ TODO:
 SERVO_CHANNEL_MAPPINGS = {
     'LEFT': {
         'SHOULDER': 0,
-        'ELBOW': 2,
+        'ELBOW': 1,
     },
     'RIGHT': {
-        'SHOULDER': 1,
+        'SHOULDER': 2,
         'ELBOW': 3,
     }
 }
@@ -39,22 +41,22 @@ SERVO_CHANNEL_MAPPINGS = {
 SERVO_REST_ANGLES = {
     'LEFT': {
         'SHOULDER': 180,
-        'ELBOW': 180,
+        'ELBOW': 0,
     },
     'RIGHT': {
         'SHOULDER': 0,
-        'ELBOW': 0,
+        'ELBOW': 180,
     }
 }
 
 SERVO_PADDLE_ANGLES = {
     'LEFT': {
-        'SHOULDER': 80,
-        'ELBOW': 30,
+        'SHOULDER': 85,
+        'ELBOW': 180,
     },
     'RIGHT': {
-        'SHOULDER': 80,
-        'ELBOW': 150,
+        'SHOULDER': 85,
+        'ELBOW': 0,
     }
 }
 
@@ -68,6 +70,7 @@ def set_servo_posistion(side, joint, positions):
     channel = SERVO_CHANNEL_MAPPINGS[side][joint]
     angle = positions[side][joint]
     kit.servo[channel].angle = angle
+    # print(f"Set {side} {joint} ({channel}) to {angle} degrees")
 
 # def set_servo_posistions(positions):
 #     global kit, SERVO_SHOULDERS, SERVO_ELBOWS, SERVO_CHANNEL_MAPPINGS
@@ -193,35 +196,49 @@ class ArmFSM:
             if fire:
                 self.current_state = ArmFSM.SHOULDER_PADDLING
                 self.time_in_state = 0.0
+                # time.sleep(ELBOW_DELAY)
                 set_servo_posistion(self.side, 'SHOULDER', SERVO_PADDLE_ANGLES)
         elif self.current_state == ArmFSM.PADDLE:
             if fire:
                 self.current_state = ArmFSM.SHOULDER_RESETTING
                 self.time_in_state = 0.0
+                # time.sleep(ELBOW_DELAY)
                 set_servo_posistion(self.side, 'SHOULDER', SERVO_REST_ANGLES)
 
-        
-def reset(left_state, right_state):
-    left_state.current_state = ArmFSM.PADDLE
-    right_state.current_state = ArmFSM.PADDLE
+    @classmethod
+    def reset(cls, left_state, right_state):
+        print("Fully resetting...")
+        left_state.current_state = cls.PADDLE
+        right_state.current_state = cls.PADDLE
 
-    left_state.next_state(0.0, True)
-    right_state.next_state(0.0, True)
+        left_state.next_state(0.0, True)
+        right_state.next_state(0.0, True)
 
-    left_state.time_in_state = 0.0
-    right_state.time_in_state = 0.0
-
-    t0 = time.time()
-    t1 = time.time()
-    delta = 1 / 100
-
-    while left_state.current_state != ArmFSM.RESET or right_state.current_state != ArmFSM.RESET:
+        t0 = time.time()
         t1 = time.time()
-        delta = t1 - t0
-        t0 = t1
+        delta = 1 / 100
 
-        left_state.next_state(delta, False)
-        right_state.next_state(delta, False)
+        while left_state.current_state != cls.RESET or right_state.current_state != cls.RESET:
+            t1 = time.time()
+            delta = t1 - t0
+            t0 = t1
+
+            left_state.next_state(delta, False)
+            right_state.next_state(delta, False)
+        print("Fully reset")
+
+class LeftRightFSM:
+    LEFT_FIRST = 0
+    RIGHT_FIRST = 1
+
+    def __init__(self):
+        self.current_state = self.LEFT_FIRST
+
+    def next_state(self):
+        if self.current_state == self.LEFT_FIRST:
+            self.current_state = self.RIGHT_FIRST
+        elif self.current_state == self.RIGHT_FIRST:
+            self.current_state = self.LEFT_FIRST
     
 
 class FSM:
@@ -246,21 +263,21 @@ class FSM:
 left_state = ArmFSM('LEFT')
 right_state = ArmFSM('RIGHT')
 
-reset(left_state, right_state)
+left_right_state = LeftRightFSM()
 #------------------------------------------------------------------------------#
-
-print("Starting...")
-# reset_servo_posistions()
-print("Ready!")
 
 t0 = time.time()
 t1 = time.time()
 delta = 1 / 100
 
-print("Press CTRL+C to end the program.\n")
 
 try:
-    # raise Exception("This is a test exception")
+    print("Starting...")
+    ArmFSM.reset(left_state, right_state)
+    print("Ready")
+
+    print("Press CTRL+C to end the program.\n")
+
     while True:
 
         #----------------------------------------------------------------------#
@@ -298,8 +315,20 @@ try:
         #----------------------------------------------------------------------#
 
         #----------------------------------------------------------------------#
-        left_state.next_state(delta, True)
-        right_state.next_state(delta, True)
+        if buttons_down['B']:
+            ArmFSM.reset(left_state, right_state)
+        else:
+            right_state.next_state(delta, True)
+            left_state.next_state(delta, True)
+
+            # left_right_state.next_state()
+
+            # if left_right_state.current_state == LeftRightFSM.LEFT_FIRST:
+            #     left_state.next_state(delta, True)
+            #     right_state.next_state(delta, True)
+            # elif left_right_state.current_state == LeftRightFSM.RIGHT_FIRST:
+            #     right_state.next_state(delta, True)
+            #     left_state.next_state(delta, True)
 
         # left_state.next_state(delta, !buttons_down['RB'])
         # right_state.next_state(delta, !buttons_down['LB'])
@@ -309,7 +338,7 @@ except:
 finally:
     print("Exiting...")
     try:
-        reset(left_state, right_state)
+        ArmFSM.reset(left_state, right_state)
     except:
         ...
     finally:
@@ -319,4 +348,4 @@ finally:
 
     GPIO.cleanup()
     gamepad.close()
-    print("\nDone")
+    print("\nDone!")
