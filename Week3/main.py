@@ -1,3 +1,12 @@
+"""
+Controls:
+- Start moving forward: Y (press once)
+- Stop moving: B (hold)
+- Turn left: LB (hold)
+- Turn right: RB (hold)
+"""
+
+
 import evdev
 import RPi.GPIO as GPIO
 import adafruit_servokit
@@ -11,15 +20,12 @@ print(f"Gamepad: {gamepad}")
 
 """
 TODO:
-- Actually go forward
-    - Grippers on the top of the paddles
 - Tweak the angles
     - For the overall
     - And for differences in left/right due to mounting and servo differences
 - Test with controller
 - Frictionless back
     - Use bar instead of circle
-- Foam under the front
 - Strength/durability/reliability
 - Speed
 """
@@ -39,6 +45,18 @@ SERVO_CHANNEL_MAPPINGS = {
         'ELBOW': 3,
     }
 }
+
+SERVO_START_ANGLES = {
+    'LEFT': {
+        'SHOULDER': 180,
+        'ELBOW': 180,
+    },
+    'RIGHT': {
+        'SHOULDER': 0,
+        'ELBOW': 0,
+    }
+}
+
 
 SERVO_REST_ANGLES = {
     'LEFT': {
@@ -62,8 +80,8 @@ SERVO_PADDLE_ANGLES = {
     }
 }
 
-SHOULDER_DELAY = 0.45
-ELBOW_DELAY = 0.75
+SHOULDER_DELAY = 0.6
+ELBOW_DELAY = 0.9
 
 # To paddle: shoulder down, arm back, shoulder up, arm reset
 
@@ -235,11 +253,16 @@ class LeftRightFSM:
         elif self.current_state == self.RIGHT_FIRST:
             self.current_state = self.LEFT_FIRST
 
+class MovingFSM:
+    STOPPED = 0
+    MOVING = 1
 
 left_state = ArmFSM('LEFT')
 right_state = ArmFSM('RIGHT')
 
 left_right_state = LeftRightFSM()
+
+moving_state = MovingFSM.STOPPED
 #------------------------------------------------------------------------------#
 
 t0 = time.time()
@@ -248,11 +271,48 @@ delta = 1 / 100
 
 
 try:
+
+    #--------------------------------------------------------------------------#
     print("Starting...")
+    for side in SERVO_CHANNEL_MAPPINGS:
+            for joint in SERVO_CHANNEL_MAPPINGS[side]:
+                set_servo_posistion(side, joint, SERVO_START_ANGLES)  
+    #--------------------------------------------------------------------------#
+
+    print("\nPress Y to start moving")
+    print("Press CTRL+C to end the program.\n")
+
+    #--------------------------------------------------------------------------#
+    while not buttons_down['Y']:
+        new_button = False
+        new_stick = False
+
+        try:
+            event = gamepad.read_one()
+
+            eventinfo = evdev.categorize(event)
+            if event.type == 1:
+                new_button = True
+                code_button = eventinfo.scancode
+                value_button = eventinfo.keystate
+            elif event.type == 3:
+                new_stick = True
+                code_stick = eventinfo.event.code
+                value_stick = eventinfo.event.value
+        except:
+            pass
+
+        if new_button:
+            set_all_buttons_downpressed(code_button, value_button)
+        if new_stick:
+            set_all_sticks_downpressed(code_stick, value_stick)
+    #--------------------------------------------------------------------------#
+
+    #--------------------------------------------------------------------------#
+    print("Moving...")
     ArmFSM.reset(left_state, right_state)
     print("Ready")
-
-    print("Press CTRL+C to end the program.\n")
+    #--------------------------------------------------------------------------#
 
     while True:
 
@@ -290,8 +350,8 @@ try:
         #----------------------------------------------------------------------#
         if buttons_down['B']:
             ArmFSM.reset(left_state, right_state)
-        else:
-            print(buttons_down['RB'], buttons_down['LB'])
+        elif moving_state == MovingFSM.MOVING or buttons_down['Y']:
+            moving_state = MovingFSM.MOVING
             if buttons_down['RB'] and not buttons_down['LB']:
                 left_state.next_state(delta, True)
                 right_state.next_state(delta, False)
