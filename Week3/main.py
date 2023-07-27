@@ -60,7 +60,7 @@ SERVO_START_ANGLES = {
 
 SERVO_REST_ANGLES = {
     'LEFT': {
-        'SHOULDER': 150,
+        'SHOULDER': 130,
         'ELBOW': 0,
     },
     'RIGHT': {
@@ -71,7 +71,7 @@ SERVO_REST_ANGLES = {
 
 SERVO_PADDLE_ANGLES = {
     'LEFT': {
-        'SHOULDER': 65,
+        'SHOULDER': 30,
         'ELBOW': 180,
     },
     'RIGHT': {
@@ -80,8 +80,8 @@ SERVO_PADDLE_ANGLES = {
     }
 }
 
-SHOULDER_DELAY = 0.6
-ELBOW_DELAY = 0.9
+SHOULDER_DELAY = 0.4
+ELBOW_DELAY = 0.7
 
 # To paddle: shoulder down, arm back, shoulder up, arm reset
 
@@ -360,7 +360,8 @@ try:
                 left_state.next_state(delta, False)
             else:
                 if left_state.current_state == ArmFSM.RESET and right_state.current_state == ArmFSM.RESET:
-                    left_right_state.next_state()
+                    # left_right_state.next_state()
+                    left_right_state.current_state = LeftRightFSM.LEFT_FIRST
 
                     if left_right_state.current_state == LeftRightFSM.LEFT_FIRST:
                         left_state.next_state(delta, True)
