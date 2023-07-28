@@ -11,35 +11,67 @@ import time
 
 import face_detect
 
+"""
+from gpiozero import Servo
+from gpiozero.pins.pigpio import PiGPIOFactory
+factory = PiGPIOFactory()
+servo = Servo(12, min_pulse=0.5/1000, max_pulse=2.5/1000, pin_factory=factory)
+
+servo.value = (-1, 1)
+"""
+
 
 #------------------------------------------------------------------------------#
 kit = adafruit_servokit.ServoKit(channels=16)
 
-GPIO_Servo = 27
-
 SERVO_CHANNEL = 9
-pi = pigpio.pi()
 
-def set_pulsewidth(speed):
-    print(speed)
-    # speed: -1 to 1
+# GPIO_Servo = 27
 
-    duty_min = 1470
-    duty_max = 1507
+# pi = pigpio.pi()
 
-    middle = (duty_min + duty_max) / 2
-    dif = middle - duty_min
+# def set_pulsewidth(speed):
+#     # print(speed)
+#     # speed: -1, 0, 1
 
-    pulsewidth = middle + dif * speed
-    print(pulsewidth)
+#     duty_min = 1474
+#     duty_max = 1506
 
-    pi.set_servo_pulsewidth(GPIO_Servo, int(pulsewidth))
+#     middle = (duty_min + duty_max) / 2
+#     dif = middle - duty_min
+
+#     pulsewidth = middle + dif * speed
+#     # print(pulsewidth)
+
+#     pi.set_servo_pulsewidth(GPIO_Servo, int(pulsewidth))
+#     time.sleep(0.1)
+#     pi.set_servo_pulsewidth(GPIO_Servo, 0)
+
+GPIO.setmode(GPIO.BCM)
+
+GPIO_Ain1 = 16
+GPIO_Ain2 = 20
+GPIO_Apwm = 21
+
+GPIO.setup(GPIO_Ain1, GPIO.OUT)
+GPIO.setup(GPIO_Ain2, GPIO.OUT)
+GPIO.setup(GPIO_Apwm, GPIO.OUT)
+
+GPIO.output(GPIO_Ain1, True)
+GPIO.output(GPIO_Ain2, False)
+
+pwm_frequency = 50
+pwm = GPIO.PWM(GPIO_Apwm, pwm_frequency)
+pwm.start(0)
 
 
 VERTICAL_ANGLE_SPEED = 10.0
 VERTICAL_ANGLE_MIN = 30.0
 VERTICAL_ANGLE_MAX = 150.0
 VERTICAL_ANGLE_CENTER = 90.0
+
+K_P_Y = 1.0
+K_D_Y = 0.2
 
 horizontal_movement = 0.0
 
@@ -84,6 +116,7 @@ delta = 1 / 100
 
 #------------------------------------------------------------------------------#
 SCREEN_SIZE = (640, 480)
+# SCREEN_SIZE = (320, 240)
 FRAMERATE = 20
 
 camera = picamera.PiCamera()
@@ -99,6 +132,8 @@ rawframe = picamera.array.PiRGBArray(camera, size=(SCREEN_SIZE[0], SCREEN_SIZE[1
 last_center_x = None
 last_center_y = None
 
+last_error_y = None
+
 try:
     print("Starting camera...")
     time.sleep(0.5)
@@ -111,7 +146,7 @@ try:
         delta = t1 - t0
         t0 = t1
 
-        # print(f"Delta: {int(delta * 1000)}\tFPS: {int(1 / delta)}")
+        print(f"Delta: {int(delta * 1000)}\tFPS: {int(1 / delta)}")
         #----------------------------------------------------------------------#
 
 
@@ -141,10 +176,17 @@ try:
             elif last_center_x > 0.5:
                 horizontal_speed = -1.0
 
-            if last_center_y < 0.5:
-                vertical_angle -= VERTICAL_ANGLE_SPEED * delta
-            elif last_center_y > 0.5:
-                vertical_angle += VERTICAL_ANGLE_SPEED * delta
+            error_y = last_center_y - 0.5
+            if last_error_y is not None:
+                d_error_y = (error_y - last_error_y) / delta
+            else:
+                d_error_y = 0.0
+            last_error_y = error_y
+
+            total_error_y = K_P_Y * error_y + K_D_Y * d_error_y
+            print(f"total_error_y: {total_error_y}")
+
+            vertical_angle += total_error_y * delta
         else:
             horizontal_speed = 0.0
 
@@ -155,7 +197,9 @@ try:
         kit.servo[SERVO_CHANNEL].angle = vertical_angle
 
         horizontal_movement += horizontal_speed * delta
-        set_pulsewidth(horizontal_speed)
+        print(horizontal_movement)
+        # set_pulsewidth(-1.0)
+        pwm.ChangeDutyCycle(10)
 
 
     
@@ -177,14 +221,36 @@ try:
 finally:
     print("Exiting...")
 
-    kit.servo[SERVO_CHANNEL].angle = VERTICAL_ANGLE_CENTER
+    try:
+        kit.servo[SERVO_CHANNEL].angle = VERTICAL_ANGLE_CENTER
+        time.sleep(0.5)
 
-    GPIO.cleanup()
+        # t0 = time.time()
+        # t1 = time.time()
+        # delta = 1 / 100
 
-    pi.set_servo_pulsewidth(GPIO_Servo, 0)
-    pi.stop()
 
-    cv2.destroyAllWindows()
-    camera.close()
+        # # get horizontal servo to center
+        # while horizontal_movement > 0.2 or horizontal_movement < -0.2:
+        #     t1 = time.time()
+        #     delta = t1 - t0
+        #     t0 = t1
+
+        #     horizontal_speed = -1.0 if horizontal_movement > 0 else 1.0
+
+        #     horizontal_movement += horizontal_speed * delta
+        #     set_pulsewidth(horizontal_speed)
+
+        #     time.sleep(0.05) 
+
+    finally:
+
+        GPIO.cleanup()
+
+        # pi.set_servo_pulsewidth(GPIO_Servo, 0)
+        # pi.stop()
+
+        cv2.destroyAllWindows()
+        camera.close()
 
     print("Done.\n")
