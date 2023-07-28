@@ -1,10 +1,11 @@
 import cv2
 
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+frontal_face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+profile_face_cascade = cv2.CascadeClassifier('haarcascade_profileface.xml')
 
 class FaceDetected:
-    def __init__(self, face, screen_size):
-        self.x = face[0]
+    def __init__(self, face, screen_size, flip = False):
+        self.x = face[0] if not flip else screen_size[0] - face[0] - face[2]
         self.y = face[1]
         self.w = face[2]
         self.h = face[3]
@@ -39,5 +40,17 @@ def detect_largest_face(grey_image, screen_size):
         return max(faces, key=FaceDetected.calc_area)
 
 def detect_faces(grey_image, screen_size):
-    faces = face_cascade.detectMultiScale(grey_image, 1.3, 5)
-    return [FaceDetected(face, screen_size) for face in faces]
+    frontal_faces = frontal_face_cascade.detectMultiScale(grey_image, 1.3, 4)
+
+    profile_faces_1 = profile_face_cascade.detectMultiScale(grey_image, 1.3, 4)
+    profile_faces_2 = profile_face_cascade.detectMultiScale(cv2.flip(grey_image, 1), 1.3, 3)
+
+    face_results = [(frontal_faces, False), (profile_faces_1, False), (profile_faces_2, True)]
+    
+    detected_faces = []
+    for faces in face_results:
+        faces, flip = faces
+        for face in faces:
+            detected_faces.append(FaceDetected(face, screen_size, flip))
+
+    return detected_faces
