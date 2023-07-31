@@ -40,21 +40,20 @@ def angle_to_value(angle):
 # VERTICAL_ANGLE_SPEED = 10.0
 VERTICAL_ANGLE_MIN = 15.0
 VERTICAL_ANGLE_MAX = 165.0
-VERTICAL_ANGLE_CENTER = 90.0
-VERTICAL_SPEED_MODIFIER = 20.0
+VERTICAL_ANGLE_CENTER = 75.0
 
 HORIZONTAL_ANGLE_MIN = 0.0
 HORIZONTAL_ANGLE_MAX = 180.0
 HORIZONTAL_ANGLE_CENTER = 90.0
-HORIZONTAL_SPEED_MODIFIER = 20.0
 
 top_servo.value = angle_to_value(VERTICAL_ANGLE_CENTER)
 bot_servo.value = angle_to_value(HORIZONTAL_ANGLE_CENTER)
 
-K_P_Y = 1.2
-K_D_Y = 0.1
+K_P = 0.7
+K_D = 0.05
 
-horizontal_movement = 0.0
+DEAD_ZONE_SIZE = 0.1
+
 
 vertical_angle = VERTICAL_ANGLE_CENTER
 horizontal_angle = HORIZONTAL_ANGLE_CENTER
@@ -64,7 +63,7 @@ class ModeFSM:
     WAITING = 1
     SCANNING = 2
 
-    MAX_WAIT_TIME = 10.0
+    MAX_WAIT_TIME = 20.0
 
     def __init__(self):
         self.current_state = ModeFSM.SCANNING
@@ -82,9 +81,6 @@ class ModeFSM:
                 self.current_state = ModeFSM.SCANNING
                 self.time_in_state = 0.0
 
-    def should_track(self):
-        # track to center of face if possible, else to last center
-        return self.current_state in [ModeFSM.TRACKING, ModeFSM.WAITING]
 #------------------------------------------------------------------------------#
 
 def clamp(n, smallest, largest): return max(smallest, min(n, largest))
@@ -108,7 +104,6 @@ HORIZONTAL_CAMERA_FOV = 62.2
 HORIZONTAL_CAMERA_FOV_SCALE_FACTOR = math.tan(deg_to_rad(HORIZONTAL_CAMERA_FOV / 2.0))
 VERTICAL_CAMERA_FOV = 48.8
 VERTICAL_CAMERA_FOV_SCALE_FACTOR = math.tan(deg_to_rad(VERTICAL_CAMERA_FOV / 2.0))
-print(VERTICAL_CAMERA_FOV_SCALE_FACTOR)
 
 camera = picamera.PiCamera()
 camera.resolution = (SCREEN_SIZE[0], SCREEN_SIZE[1])
@@ -144,18 +139,35 @@ try:
 
         #----------------------------------------------------------------------#
         image = frame.array
-
         grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+
+        #----------------------------------------------------------------------#
+        # center dead zone
+        top_left = (int(SCREEN_SIZE[0] * (1 - DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 - DEAD_ZONE_SIZE) / 2))
+        bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
+        cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
+
     
         face = face_detect.detect_largest_face(grey_image, SCREEN_SIZE)
         if face is not None:
             face.draw(image)
-            last_center_x = face.prop_center_x
-            last_center_y = face.prop_center_y
+            # ignore dead zone
+            if (
+                face.prop_center_x < (1 - DEAD_ZONE_SIZE) / 2 or
+                face.prop_center_x > (1 + DEAD_ZONE_SIZE) / 2 or
+                face.prop_center_y < (1 - DEAD_ZONE_SIZE) / 2 or
+                face.prop_center_y > (1 + DEAD_ZONE_SIZE) / 2
+            ):
+                last_center_x = face.prop_center_x
+                last_center_y = face.prop_center_y
+            else:
+                last_center_x = None
+                last_center_y = None
         else:
             last_center_x = None
             last_center_y = None
-            pass
+            # pass
 
         # faces = face_detect.detect_faces(grey_image, SCREEN_SIZE)
         # for face in faces:
@@ -166,40 +178,46 @@ try:
 
             error_x = last_center_x - 0.5
             scaled_error_x = scale(error_x, -0.5, 0.5, -HORIZONTAL_CAMERA_FOV_SCALE_FACTOR, HORIZONTAL_CAMERA_FOV_SCALE_FACTOR)
-            angle_dif_rad = math.atan(scaled_error_x)
-            angle_dif = rad_to_deg(angle_dif_rad)
-            horizontal_angle -= angle_dif
+            angle_dif_rad_x = math.atan(scaled_error_x)
+            angle_dif_x = rad_to_deg(angle_dif_rad_x)
+            # horizontal_angle -= angle_dif
 
             error_y = last_center_y - 0.5
             scaled_error_y = scale(error_y, -0.5, 0.5, -VERTICAL_CAMERA_FOV_SCALE_FACTOR, VERTICAL_CAMERA_FOV_SCALE_FACTOR)
-            angle_dif_rad = math.atan(scaled_error_y)
-            angle_dif = rad_to_deg(angle_dif_rad)
-            vertical_angle += angle_dif
+            angle_dif_rad_y = math.atan(scaled_error_y)
+            angle_dif_y = rad_to_deg(angle_dif_rad_y)
+            # vertical_angle += angle_dif
 
-            # error_x = last_center_x - 0.5
-            # if last_error_x is not None:
-            #     d_error_x = (error_x - last_error_x) / delta
-            # else:
-            #     d_error_x = 0.0
-            # last_error_x = error_x
+            if last_error_x is not None:
+                d_error_x = (angle_dif_x - last_error_x) / delta
+            else:
+                d_error_x = 0.0
+            last_error_x = angle_dif_x
 
-            # total_error_x = K_P_Y * error_x + K_D_Y * d_error_x
-            # horizontal_angle -= total_error_x * delta * HORIZONTAL_SPEED_MODIFIER
+            if last_error_y is not None:
+                d_error_y = (angle_dif_y - last_error_y) / delta
+            else:
+                d_error_y = 0.0
+            last_error_y = angle_dif_y
 
+            total_error_x = K_P * angle_dif_x + K_D * d_error_x
+            total_error_y = K_P * angle_dif_y + K_D * d_error_y
 
-            # error_y = last_center_y - 0.5
-            # if last_error_y is not None:
-            #     d_error_y = (error_y - last_error_y) / delta
-            # else:
-            #     d_error_y = 0.0
-            # last_error_y = error_y
+            horizontal_angle -= total_error_x
+            vertical_angle += total_error_y
 
-            # total_error_y = K_P_Y * error_y + K_D_Y * d_error_y
-            # vertical_angle += total_error_y * delta * VERTICAL_SPEED_MODIFIER
+            # convert errors back to screen posistions
+            angle_dif_rad_x = deg_to_rad(total_error_x)
+            pos_dif_scaled_x = math.tan(angle_dif_rad_x)
+            pos_dif_x = scale(pos_dif_scaled_x, -HORIZONTAL_CAMERA_FOV_SCALE_FACTOR, HORIZONTAL_CAMERA_FOV_SCALE_FACTOR, -0.5, 0.5)
 
-            # start_point = (int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2))
-            # end_point = (int(SCREEN_SIZE[0] * (total_error_x + 0.5)), int(SCREEN_SIZE[1] * (total_error_y + 0.5)))
-            # cv2.line(image, start_point, end_point, (255, 255, 0), 2)
+            angle_dif_rad_y = deg_to_rad(total_error_y)
+            pos_dif_scaled_y = math.tan(angle_dif_rad_y)
+            pos_dif_y = scale(pos_dif_scaled_y, -VERTICAL_CAMERA_FOV_SCALE_FACTOR, VERTICAL_CAMERA_FOV_SCALE_FACTOR, -0.5, 0.5)
+
+            start_point = (int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2))
+            end_point = (int(SCREEN_SIZE[0] * (pos_dif_x + 0.5)), int(SCREEN_SIZE[1] * (pos_dif_y + 0.5)))
+            cv2.line(image, start_point, end_point, (255, 255, 0), 2)
 
 
 
