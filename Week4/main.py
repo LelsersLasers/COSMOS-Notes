@@ -1,7 +1,8 @@
 import picamera
 import picamera.array  # This needs to be imported explicitly
 import cv2
-import numpy as np
+# import numpy as np
+import math
 
 import RPi.GPIO as GPIO
 # import adafruit_servokit
@@ -87,6 +88,10 @@ class ModeFSM:
 #------------------------------------------------------------------------------#
 
 def clamp(n, smallest, largest): return max(smallest, min(n, largest))
+def scale(n, lower_from, upper_from, lower_to, upper_to): return (n - lower_from) / (upper_from - lower_from) * (upper_to - lower_to) + lower_to
+
+def deg_to_rad(deg): return deg * math.pi / 180.0
+def rad_to_deg(rad): return rad * 180.0 / math.pi
 
 #------------------------------------------------------------------------------#
 t0 = time.time()
@@ -98,6 +103,12 @@ delta = 1 / 100
 SCREEN_SIZE = (640, 480)
 # SCREEN_SIZE = (320, 240)
 FRAMERATE = 20
+
+HORIZONTAL_CAMERA_FOV = 62.2
+HORIZONTAL_CAMERA_FOV_SCALE_FACTOR = math.tan(deg_to_rad(HORIZONTAL_CAMERA_FOV / 2.0))
+VERTICAL_CAMERA_FOV = 48.8
+VERTICAL_CAMERA_FOV_SCALE_FACTOR = math.tan(deg_to_rad(VERTICAL_CAMERA_FOV / 2.0))
+print(VERTICAL_CAMERA_FOV_SCALE_FACTOR)
 
 camera = picamera.PiCamera()
 camera.resolution = (SCREEN_SIZE[0], SCREEN_SIZE[1])
@@ -142,8 +153,8 @@ try:
             last_center_x = face.prop_center_x
             last_center_y = face.prop_center_y
         else:
-            # last_center_x = None
-            # last_center_y = None
+            last_center_x = None
+            last_center_y = None
             pass
 
         # faces = face_detect.detect_faces(grey_image, SCREEN_SIZE)
@@ -154,43 +165,55 @@ try:
             cv2.circle(image, (int(last_center_x * SCREEN_SIZE[0]), int(last_center_y * SCREEN_SIZE[1])), 5, (0, 0, 255), -1)
 
             error_x = last_center_x - 0.5
-            if last_error_x is not None:
-                d_error_x = (error_x - last_error_x) / delta
-            else:
-                d_error_x = 0.0
-            last_error_x = error_x
-
-            total_error_x = K_P_Y * error_x + K_D_Y * d_error_x
-            horizontal_angle -= total_error_x * delta * HORIZONTAL_SPEED_MODIFIER
-
+            scaled_error_x = scale(error_x, -0.5, 0.5, -HORIZONTAL_CAMERA_FOV_SCALE_FACTOR, HORIZONTAL_CAMERA_FOV_SCALE_FACTOR)
+            angle_dif_rad = math.atan(scaled_error_x)
+            angle_dif = rad_to_deg(angle_dif_rad)
+            horizontal_angle -= angle_dif
 
             error_y = last_center_y - 0.5
-            if last_error_y is not None:
-                d_error_y = (error_y - last_error_y) / delta
-            else:
-                d_error_y = 0.0
-            last_error_y = error_y
+            scaled_error_y = scale(error_y, -0.5, 0.5, -VERTICAL_CAMERA_FOV_SCALE_FACTOR, VERTICAL_CAMERA_FOV_SCALE_FACTOR)
+            angle_dif_rad = math.atan(scaled_error_y)
+            angle_dif = rad_to_deg(angle_dif_rad)
+            vertical_angle += angle_dif
 
-            total_error_y = K_P_Y * error_y + K_D_Y * d_error_y
-            vertical_angle += total_error_y * delta * VERTICAL_SPEED_MODIFIER
+            # error_x = last_center_x - 0.5
+            # if last_error_x is not None:
+            #     d_error_x = (error_x - last_error_x) / delta
+            # else:
+            #     d_error_x = 0.0
+            # last_error_x = error_x
 
-            start_point = (int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2))
-            end_point = (int(SCREEN_SIZE[0] * (total_error_x + 0.5)), int(SCREEN_SIZE[1] * (total_error_y + 0.5)))
-            cv2.line(image, start_point, end_point, (255, 255, 0), 2)
+            # total_error_x = K_P_Y * error_x + K_D_Y * d_error_x
+            # horizontal_angle -= total_error_x * delta * HORIZONTAL_SPEED_MODIFIER
+
+
+            # error_y = last_center_y - 0.5
+            # if last_error_y is not None:
+            #     d_error_y = (error_y - last_error_y) / delta
+            # else:
+            #     d_error_y = 0.0
+            # last_error_y = error_y
+
+            # total_error_y = K_P_Y * error_y + K_D_Y * d_error_y
+            # vertical_angle += total_error_y * delta * VERTICAL_SPEED_MODIFIER
+
+            # start_point = (int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2))
+            # end_point = (int(SCREEN_SIZE[0] * (total_error_x + 0.5)), int(SCREEN_SIZE[1] * (total_error_y + 0.5)))
+            # cv2.line(image, start_point, end_point, (255, 255, 0), 2)
 
 
 
 
         horizontal_angle = clamp(horizontal_angle, HORIZONTAL_ANGLE_MIN, HORIZONTAL_ANGLE_MAX)
         bot_servo.value = angle_to_value(horizontal_angle)
-        print(f"horizontal_angle: {horizontal_angle}")
+        # print(f"horizontal_angle: {horizontal_angle}")
 
 
         vertical_angle = clamp(vertical_angle, VERTICAL_ANGLE_MIN, VERTICAL_ANGLE_MAX)
         top_servo.value = angle_to_value(vertical_angle)
-        print(f"vertical_angle: {vertical_angle}")
+        # print(f"vertical_angle: {vertical_angle}")
 
-        print("\n")
+        # print("\n")
 
 
     
