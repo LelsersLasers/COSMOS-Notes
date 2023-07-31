@@ -40,17 +40,18 @@ def detect_largest_face(grey_image, screen_size):
         return max(faces, key=FaceDetected.calc_area)
 
 def detect_faces(grey_image, screen_size):
-    frontal_faces = frontal_face_cascade.detectMultiScale(grey_image, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    frontal_faces = frontal_face_cascade.detectMultiScale(grey_image, scaleFactor=1.2, minNeighbors=6, minSize=(30, 30))
 
-    # profile_faces_1 = profile_face_cascade.detectMultiScale(grey_image,  scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-    # profile_faces_2 = profile_face_cascade.detectMultiScale(cv2.flip(grey_image, 1),  scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    profile_faces_1 = profile_face_cascade.detectMultiScale(grey_image,  scaleFactor=1.2, minNeighbors=6, minSize=(30, 30))
+    profile_faces_2 = profile_face_cascade.detectMultiScale(cv2.flip(grey_image, 1),  scaleFactor=1.2, minNeighbors=6, minSize=(30, 30))
 
-    # face_results = [(frontal_faces, False), (profile_faces_1, False), (profile_faces_2, True)]
+    face_results = [(frontal_faces, False), (profile_faces_1, False), (profile_faces_2, True)]
     
     detected_faces = []
-    for faces in [frontal_faces]:
-        # faces, flip = faces
+    # for faces in [(frontal_faces, False)]:
+    for faces in face_results:
+        faces, flip = faces
         for face in faces:
-            detected_faces.append(FaceDetected(face, screen_size))
+            detected_faces.append(FaceDetected(face, screen_size, flip))
 
     return detected_faces
