@@ -15,12 +15,17 @@ import time
 import face_detect
 
 """
-from gpiozero import Servo
-from gpiozero.pins.pigpio import PiGPIOFactory
-factory = PiGPIOFactory()
-servo = Servo(12, min_pulse=0.5/1000, max_pulse=2.5/1000, pin_factory=factory)
-
-servo.value = (-1, 1)
+TODO:
+- Fan
+    - Mounting
+    - Controling speed/on/off
+- 3d print
+    - Housing
+    - Mounting
+- Sound sensor
+    - 2 claps to turn on/off
+- Tuning
+- Website controller (super reach)
 """
 
 
@@ -38,13 +43,16 @@ def angle_to_value(angle):
 
 
 # VERTICAL_ANGLE_SPEED = 10.0
-VERTICAL_ANGLE_MIN = 15.0
-VERTICAL_ANGLE_MAX = 165.0
+VERTICAL_ANGLE_MIN = 60.0
+VERTICAL_ANGLE_MAX = 135.0
 VERTICAL_ANGLE_CENTER = 75.0
 
 HORIZONTAL_ANGLE_MIN = 0.0
 HORIZONTAL_ANGLE_MAX = 180.0
 HORIZONTAL_ANGLE_CENTER = 90.0
+
+HORIZONTAL_TRACKING_SPEED = 30.0 # degrees per second
+VERTICAL_TRACKING_TICK = 15.0 # degrees
 
 top_servo.value = angle_to_value(VERTICAL_ANGLE_CENTER)
 bot_servo.value = angle_to_value(HORIZONTAL_ANGLE_CENTER)
@@ -57,13 +65,16 @@ DEAD_ZONE_SIZE = 0.1
 
 vertical_angle = VERTICAL_ANGLE_CENTER
 horizontal_angle = HORIZONTAL_ANGLE_CENTER
+
+vertical_tracking_direction = -1
+horizontal_tracking_direction = 1
 #------------------------------------------------------------------------------#
 class ModeFSM:
     TRACKING = 0
     WAITING = 1
     SCANNING = 2
 
-    MAX_WAIT_TIME = 20.0
+    MAX_WAIT_TIME = 5.0
 
     def __init__(self):
         self.current_state = ModeFSM.SCANNING
@@ -81,6 +92,10 @@ class ModeFSM:
                 self.current_state = ModeFSM.SCANNING
                 self.time_in_state = 0.0
 
+    def fan_should_be_on(self):
+        return self.current_state in [ModeFSM.TRACKING, ModeFSM.WAITING]
+
+current_state = ModeFSM()
 #------------------------------------------------------------------------------#
 
 def clamp(n, smallest, largest): return max(smallest, min(n, largest))
@@ -114,7 +129,6 @@ camera.hflip = False
 rawframe = picamera.array.PiRGBArray(camera, size=(SCREEN_SIZE[0], SCREEN_SIZE[1]))
 #------------------------------------------------------------------------------#
 
-
 last_center_x = None
 last_center_y = None
 
@@ -132,7 +146,6 @@ try:
         t1 = time.time()
         delta = t1 - t0
         t0 = t1
-
         # print(f"Delta: {int(delta * 1000)}\tFPS: {int(1 / delta)}")
         #----------------------------------------------------------------------#
 
@@ -140,40 +153,35 @@ try:
         #----------------------------------------------------------------------#
         image = frame.array
         grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
+        #----------------------------------------------------------------------#
+        
 
         #----------------------------------------------------------------------#
-        # center dead zone
-        top_left = (int(SCREEN_SIZE[0] * (1 - DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 - DEAD_ZONE_SIZE) / 2))
-        bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
-        cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
-
-    
         face = face_detect.detect_largest_face(grey_image, SCREEN_SIZE)
+        current_state.update(face, delta)
+
         if face is not None:
             face.draw(image)
-            # ignore dead zone
-            if (
+        
+        if (
+            face is not None and (
                 face.prop_center_x < (1 - DEAD_ZONE_SIZE) / 2 or
                 face.prop_center_x > (1 + DEAD_ZONE_SIZE) / 2 or
                 face.prop_center_y < (1 - DEAD_ZONE_SIZE) / 2 or
                 face.prop_center_y > (1 + DEAD_ZONE_SIZE) / 2
-            ):
-                last_center_x = face.prop_center_x
-                last_center_y = face.prop_center_y
-            else:
-                last_center_x = None
-                last_center_y = None
+            )
+        ):
+            last_center_x = face.prop_center_x
+            last_center_y = face.prop_center_y
         else:
             last_center_x = None
             last_center_y = None
-            # pass
+        #----------------------------------------------------------------------#
+        
 
-        # faces = face_detect.detect_faces(grey_image, SCREEN_SIZE)
-        # for face in faces:
-        #     face.draw(image)
 
-        if last_center_x is not None and last_center_y is not None:
+        #----------------------------------------------------------------------#
+        if last_center_x is not None and last_center_y is not None: # ModeFSM.TRACKING
             cv2.circle(image, (int(last_center_x * SCREEN_SIZE[0]), int(last_center_y * SCREEN_SIZE[1])), 5, (0, 0, 255), -1)
 
             error_x = last_center_x - 0.5
@@ -206,6 +214,10 @@ try:
             horizontal_angle -= total_error_x
             vertical_angle += total_error_y
 
+
+            horizontal_tracking_direction = 1 if total_error_x < 0 else -1
+            vertical_tracking_direction = -1 if total_error_y < 0 else 1
+
             # convert errors back to screen posistions
             angle_dif_rad_x = deg_to_rad(total_error_x)
             pos_dif_scaled_x = math.tan(angle_dif_rad_x)
@@ -218,24 +230,43 @@ try:
             start_point = (int(SCREEN_SIZE[0] / 2), int(SCREEN_SIZE[1] / 2))
             end_point = (int(SCREEN_SIZE[0] * (pos_dif_x + 0.5)), int(SCREEN_SIZE[1] * (pos_dif_y + 0.5)))
             cv2.line(image, start_point, end_point, (255, 255, 0), 2)
+        #----------------------------------------------------------------------#
+
+        #----------------------------------------------------------------------#
+        elif current_state.current_state == ModeFSM.SCANNING:
+            horizontal_angle += HORIZONTAL_TRACKING_SPEED * delta * horizontal_tracking_direction
+            # vertical_angle += TRACKING_SPEED * delta * vertical_tracking_direction / 3
+
+            if horizontal_angle >= HORIZONTAL_ANGLE_MAX:
+                horizontal_tracking_direction = -1
+                horizontal_angle = HORIZONTAL_ANGLE_MAX
+                vertical_angle += VERTICAL_TRACKING_TICK * vertical_tracking_direction
+            elif horizontal_angle <= HORIZONTAL_ANGLE_MIN:
+                horizontal_tracking_direction = 1
+                horizontal_angle = HORIZONTAL_ANGLE_MIN
+                vertical_angle += VERTICAL_TRACKING_TICK * vertical_tracking_direction
+            
+            if vertical_angle >= VERTICAL_ANGLE_MAX:
+                vertical_tracking_direction = -1
+                vertical_angle = VERTICAL_ANGLE_MAX
+            elif vertical_angle <= VERTICAL_ANGLE_MIN:
+                vertical_tracking_direction = 1
+                vertical_angle = VERTICAL_ANGLE_MIN
+        #----------------------------------------------------------------------#
 
 
 
-
+        #----------------------------------------------------------------------#
         horizontal_angle = clamp(horizontal_angle, HORIZONTAL_ANGLE_MIN, HORIZONTAL_ANGLE_MAX)
         bot_servo.value = angle_to_value(horizontal_angle)
-        # print(f"horizontal_angle: {horizontal_angle}")
-
 
         vertical_angle = clamp(vertical_angle, VERTICAL_ANGLE_MIN, VERTICAL_ANGLE_MAX)
         top_servo.value = angle_to_value(vertical_angle)
-        # print(f"vertical_angle: {vertical_angle}")
-
-        # print("\n")
-
+        #----------------------------------------------------------------------#
 
     
 
+        #----------------------------------------------------------------------#
         # vertical line
         start_point = (int(SCREEN_SIZE[0] * 0.5), 0)
         end_point = (int(SCREEN_SIZE[0] * 0.5), SCREEN_SIZE[1])
@@ -246,8 +277,14 @@ try:
         end_point = (SCREEN_SIZE[0], int(SCREEN_SIZE[1] * 0.5))
         cv2.line(image, start_point, end_point, (0, 255, 0), 2)
 
+        # center dead zone
+        top_left = (int(SCREEN_SIZE[0] * (1 - DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 - DEAD_ZONE_SIZE) / 2))
+        bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
+        cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
+
         cv2.imshow('image', image)
         cv2.waitKey(1)
+        #----------------------------------------------------------------------#
 
         rawframe.truncate(0)
 finally:
