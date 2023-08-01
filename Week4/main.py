@@ -247,6 +247,7 @@ try:
                 current_state.current_state = ModeFSM.MANUAL
             elif state["state"] == "off":
                 current_state.current_state = ModeFSM.OFF
+                reset_pos = True
             elif state["state"] == "automatic":
                 current_state.current_state = ModeFSM.SCANNING
             
