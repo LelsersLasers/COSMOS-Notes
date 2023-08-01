@@ -10,6 +10,9 @@ import RPi.GPIO as GPIO
 from gpiozero import Servo
 from gpiozero.pins.pigpio import PiGPIOFactory
 
+import Adafruit_GPIO.SPI as SPI
+import Adafruit_MCP3008
+
 import time
 
 import face_detect
@@ -57,7 +60,7 @@ VERTICAL_TRACKING_TICK = 15.0 # degrees
 top_servo.value = angle_to_value(VERTICAL_ANGLE_CENTER)
 bot_servo.value = angle_to_value(HORIZONTAL_ANGLE_CENTER)
 
-K_P = 0.7
+K_P = 0.8
 K_D = 0.05
 
 DEAD_ZONE_SIZE = 0.1
@@ -69,15 +72,45 @@ horizontal_angle = HORIZONTAL_ANGLE_CENTER
 vertical_tracking_direction = -1
 horizontal_tracking_direction = 1
 #------------------------------------------------------------------------------#
+# AUDIO_THRESHOLD = 100
+AUDIO_THRESHOLD = 150
+CLAP_SPACING = 0.2
+CLAP_WAIT = 2.0
+
+AUDIO_CHANNEL = 7
+mcp = Adafruit_MCP3008.MCP3008(spi=SPI.SpiDev(0,0))
+
+def read_audio():
+    # value = mcp.read_adc(AUDIO_CHANNEL)
+    # print(value)
+    # return value
+    return mcp.read_adc(AUDIO_CHANNEL)
+
+def check_clap():
+    return read_audio() > AUDIO_THRESHOLD
+
+# def wait_for_clap():
+#     while True:
+#         audio = read_audio()
+#         if audio > AUDIO_THRESHOLD:
+#             break
+
+# def wait_for_two_claps():
+#     wait_for_clap()
+#     time.sleep(CLAP_SPACING)
+#     wait_for_clap()
+#------------------------------------------------------------------------------#
 class ModeFSM:
     TRACKING = 0
     WAITING = 1
     SCANNING = 2
+    OFF = 3
 
-    MAX_WAIT_TIME = 5.0
+    MAX_WAIT_TIME = 10.0
+    MAX_SCAN_TIME = 20.0
 
     def __init__(self):
-        self.current_state = ModeFSM.SCANNING
+        self.current_state = ModeFSM.OFF
         self.time_in_state = 0.0
 
     def update(self, face, delta):
@@ -91,6 +124,12 @@ class ModeFSM:
             if self.time_in_state >= ModeFSM.MAX_WAIT_TIME:
                 self.current_state = ModeFSM.SCANNING
                 self.time_in_state = 0.0
+        elif self.current_state == ModeFSM.SCANNING:
+            if self.time_in_state >= ModeFSM.MAX_SCAN_TIME:
+                self.current_state = ModeFSM.OFF
+                self.time_in_state = 0.0
+                return True
+        return False            
 
     def fan_should_be_on(self):
         return self.current_state in [ModeFSM.TRACKING, ModeFSM.WAITING]
@@ -111,8 +150,9 @@ delta = 1 / 100
 #------------------------------------------------------------------------------#
 
 #------------------------------------------------------------------------------#
-SCREEN_SIZE = (640, 480)
+# SCREEN_SIZE = (640, 480)
 # SCREEN_SIZE = (320, 240)
+SCREEN_SIZE = (480, 368)
 FRAMERATE = 20
 
 HORIZONTAL_CAMERA_FOV = 62.2
@@ -135,6 +175,8 @@ last_center_y = None
 last_error_y = None
 last_error_x = None
 
+last_clap_time = None
+
 try:
     print("Starting camera...")
     time.sleep(0.5)
@@ -146,7 +188,7 @@ try:
         t1 = time.time()
         delta = t1 - t0
         t0 = t1
-        # print(f"Delta: {int(delta * 1000)}\tFPS: {int(1 / delta)}")
+        print(f"Delta: {int(delta * 1000)}ms\tFPS: {int(1 / delta)}")
         #----------------------------------------------------------------------#
 
 
@@ -154,32 +196,56 @@ try:
         image = frame.array
         grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #----------------------------------------------------------------------#
-        
+
+
+        reset_pos = False
+
 
         #----------------------------------------------------------------------#
-        face = face_detect.detect_largest_face(grey_image, SCREEN_SIZE)
-        current_state.update(face, delta)
-
-        if face is not None:
-            face.draw(image)
-        
-        if (
-            face is not None and (
-                face.prop_center_x < (1 - DEAD_ZONE_SIZE) / 2 or
-                face.prop_center_x > (1 + DEAD_ZONE_SIZE) / 2 or
-                face.prop_center_y < (1 - DEAD_ZONE_SIZE) / 2 or
-                face.prop_center_y > (1 + DEAD_ZONE_SIZE) / 2
-            )
-        ):
-            last_center_x = face.prop_center_x
-            last_center_y = face.prop_center_y
-        else:
-            last_center_x = None
-            last_center_y = None
+        if check_clap():
+            if last_clap_time is None or t1 - last_clap_time > CLAP_WAIT:
+                last_clap_time = t1
+            elif t1 - last_clap_time < CLAP_WAIT and t1 - last_clap_time > CLAP_SPACING:
+                last_clap_time = None
+                if current_state.current_state == ModeFSM.OFF:
+                    current_state.current_state = ModeFSM.SCANNING
+                else:
+                    current_state.current_state = ModeFSM.OFF
+                reset_pos = True
+                print("2 claps")
         #----------------------------------------------------------------------#
         
 
+        #----------------------------------------------------------------------#
+        if current_state.current_state != ModeFSM.OFF:
+            face = face_detect.detect_largest_face(grey_image, SCREEN_SIZE)
+            should_reset_pos = current_state.update(face, delta)
 
+            reset_pos = reset_pos or should_reset_pos
+
+            if face is not None:
+                face.draw(image)
+            
+            if (
+                face is not None and (
+                    face.prop_center_x < (1 - DEAD_ZONE_SIZE) / 2 or
+                    face.prop_center_x > (1 + DEAD_ZONE_SIZE) / 2 or
+                    face.prop_center_y < (1 - DEAD_ZONE_SIZE) / 2 or
+                    face.prop_center_y > (1 + DEAD_ZONE_SIZE) / 2
+                )
+            ):
+                last_center_x = face.prop_center_x
+                last_center_y = face.prop_center_y
+            else:
+                last_center_x = None
+                last_center_y = None
+        #----------------------------------------------------------------------#
+
+        if not current_state.fan_should_be_on():
+            last_error_x = None
+            last_error_y = None
+
+        
         #----------------------------------------------------------------------#
         if last_center_x is not None and last_center_y is not None: # ModeFSM.TRACKING
             cv2.circle(image, (int(last_center_x * SCREEN_SIZE[0]), int(last_center_y * SCREEN_SIZE[1])), 5, (0, 0, 255), -1)
@@ -215,8 +281,9 @@ try:
             vertical_angle += total_error_y
 
 
-            horizontal_tracking_direction = 1 if total_error_x < 0 else -1
-            vertical_tracking_direction = -1 if total_error_y < 0 else 1
+            horizontal_tracking_direction = -1 if total_error_x > 0 else 1
+            vertical_tracking_direction = 1 if total_error_y > 0 else 1
+
 
             # convert errors back to screen posistions
             angle_dif_rad_x = deg_to_rad(total_error_x)
@@ -255,15 +322,17 @@ try:
         #----------------------------------------------------------------------#
 
 
-
         #----------------------------------------------------------------------#
+        if reset_pos:
+            vertical_angle = VERTICAL_ANGLE_CENTER
+            horizontal_angle = HORIZONTAL_ANGLE_CENTER
+        
         horizontal_angle = clamp(horizontal_angle, HORIZONTAL_ANGLE_MIN, HORIZONTAL_ANGLE_MAX)
         bot_servo.value = angle_to_value(horizontal_angle)
 
         vertical_angle = clamp(vertical_angle, VERTICAL_ANGLE_MIN, VERTICAL_ANGLE_MAX)
         top_servo.value = angle_to_value(vertical_angle)
         #----------------------------------------------------------------------#
-
     
 
         #----------------------------------------------------------------------#
