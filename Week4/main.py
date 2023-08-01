@@ -14,6 +14,7 @@ import Adafruit_GPIO.SPI as SPI
 import Adafruit_MCP3008
 
 import time
+import json
 
 import face_detect
 
@@ -25,11 +26,34 @@ TODO:
 - 3d print
     - Housing
     - Mounting
-- Sound sensor
-    - 2 claps to turn on/off
+- Presentation
 - Tuning
 - Website controller (super reach)
 """
+
+#------------------------------------------------------------------------------#
+FILE = "state.json"
+
+state = {
+	"speed": 50,
+	"manual": False,
+	"angle1": -1,
+	"angle2": -1,
+	"power": False
+}
+
+def write_state():
+	# Write state to file
+	with open(FILE, "w") as f:
+		json.dump(state, f)
+	return
+
+def read_state():
+	# Read state from file
+	global state
+	with open(FILE, "r") as f:
+		state = json.load(f)
+	return
 
 
 #------------------------------------------------------------------------------#
@@ -128,6 +152,10 @@ class ModeFSM:
             if self.time_in_state >= ModeFSM.MAX_SCAN_TIME:
                 self.current_state = ModeFSM.OFF
                 self.time_in_state = 0.0
+
+                state["power"] = "false";
+                write_state()
+                
                 return True
         return False            
 
@@ -184,11 +212,23 @@ try:
 
     for frame in camera.capture_continuous(rawframe, format="bgr", use_video_port=True):
 
+        reset_pos = False
+
+        old_power = state["power"]
+        read_state()
+        if old_power != state["power"]:
+            if state["power"] == "true":
+                current_state.current_state = ModeFSM.SCANNING
+                current_state.time_in_state = 0.0
+            else:
+                current_state.current_state = ModeFSM.OFF
+            reset_pos = True
+
         #----------------------------------------------------------------------#
         t1 = time.time()
         delta = t1 - t0
         t0 = t1
-        print(f"Delta: {int(delta * 1000)}ms\tFPS: {int(1 / delta)}")
+        # print(f"Delta: {int(delta * 1000)}ms\tFPS: {int(1 / delta)}")
         #----------------------------------------------------------------------#
 
 
@@ -196,9 +236,6 @@ try:
         image = frame.array
         grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #----------------------------------------------------------------------#
-
-
-        reset_pos = False
 
 
         #----------------------------------------------------------------------#
@@ -209,8 +246,12 @@ try:
                 last_clap_time = None
                 if current_state.current_state == ModeFSM.OFF:
                     current_state.current_state = ModeFSM.SCANNING
+                    state["power"] = "true"
+                    write_state()
                 else:
                     current_state.current_state = ModeFSM.OFF
+                    state["power"] = "false"
+                    write_state()
                 reset_pos = True
                 print("2 claps")
         #----------------------------------------------------------------------#

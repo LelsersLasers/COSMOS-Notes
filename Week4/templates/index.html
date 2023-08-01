@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>The Fan Favorite</title>
+	<meta
+		name="description"
+		content="Extra controls for The Fan Favorite robot"
+	/>
+
+	<!-- Pico.css (Classless version) -->
+	<link
+		rel="stylesheet"
+		href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.classless.min.css"
+	/>
+</head>
+
+<body>
+
+	<label for="power">
+		<input type="checkbox" id="power" name="power" />
+		Power
+	</label>
+
+	<!-- <label for="speed">Speed:</label>
+	<output>50</output>
+	<input type="range" id="speed" name="speed" min="0" max="100" step="1" value="50" oninput="this.previousElementSibling.value = this.value" /> -->
+
+
+	<script>
+
+		const FLASK_SERVER = "http://100.81.3.125:5000"
+
+		function setOnInputs() {
+			let inputs = document.getElementsByTagName("input");
+			for (let i = 0; i < inputs.length; i++) {
+				inputs[i].addEventListener("input", function () {
+					let path = "/set/" + inputs[i].id + "/";
+					if (inputs[i].type == "checkbox") {
+						path += inputs[i].checked;
+					} else {
+						path += inputs[i].value;
+					}
+					console.log(path);
+					fetch(FLASK_SERVER + path);
+				});
+			}
+		}
+
+		setOnInputs();
+
+		setInterval(function() {
+			const path = "/get";
+			fetch(FLASK_SERVER + path)
+				.then(response => response.json())
+				.then(data => {
+					data.power = data.power == 'true';
+					console.log(data);
+					document.getElementById("power").checked = data.power;
+				});
+		}, 1000);
+
+	</script>
+</body>
