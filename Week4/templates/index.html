@@ -19,15 +19,29 @@
 
 <body>
 
-	<label for="power">
-		<input type="checkbox" id="power" name="power" />
-		Power
-	</label>
+	<main>
 
-	<!-- <label for="speed">Speed:</label>
-	<output>50</output>
-	<input type="range" id="speed" name="speed" min="0" max="100" step="1" value="50" oninput="this.previousElementSibling.value = this.value" /> -->
+		<label for="power">
+			<input type="checkbox" id="power" name="power" />
+			Power
+		</label>
 
+
+		<label for="manual">
+			<input type="checkbox" id="manual" name="manual" />
+			Manual control
+		</label>
+
+
+		<label for="angle1">Vertical Angle:</label>
+		<output>75</output>
+		<input type="range" id="angle1" name="angle1" min="45.0" max="135.0" step="0.1" value="75" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
+
+		<label for="angle2">Horizontal Angle:</label>
+		<output>90</output>
+		<input type="range" id="angle2" name="angle2" min="0.0" max="180.0" step="0.1" value="90" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
+
+	</main>
 
 	<script>
 
