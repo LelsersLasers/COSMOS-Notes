@@ -22,17 +22,22 @@
 	<main>
 		<h1 style="text-align: center; margin: 0;">The <i>Fan</i> Favorite</h1>
 	
+		<fieldset>
+            <legend><strong>Fan Mode</strong></legend>
+            <label for="automatic">
+				<input type="radio" id="automatic" name="automatic" value="automatic" />
+				Automatic
+            </label>
+            <label for="manual">
+				<input type="radio" id="manual" name="manual" value="manual" />
+				Manual
+            </label>
+			<label for="off">
+				<input type="radio" id="off" name="off" value="off" checked />
+				Off
+            </label>
+		</fieldset>
 
-		<label for="power">
-			<input type="checkbox" id="power" name="power" />
-			Power
-		</label>
-
-
-		<label for="manual">
-			<input type="checkbox" id="manual" name="manual" />
-			Manual control
-		</label>
 
 
 		<label for="angle1">Vertical Angle:</label>
@@ -50,15 +55,26 @@
 		const FLASK_SERVER = "http://100.81.3.125:5000"
 
 		function setOnInputs() {
-			let inputs = document.getElementsByTagName("input");
-			for (let i = 0; i < inputs.length; i++) {
-				inputs[i].addEventListener("input", function () {
-					let path = "/set/" + inputs[i].id + "/";
-					if (inputs[i].type == "checkbox") {
-						path += inputs[i].checked;
-					} else {
-						path += inputs[i].value;
+
+			let radios = document.querySelectorAll("input[type=radio]");
+			for (let i = 0; i < radios.length; i++) {
+				radios[i].addEventListener("change", function () {
+					if (radios[i].checked) {
+						let path = "/set/state/" + radios[i].value;
+						console.log(path);
+						fetch(FLASK_SERVER + path);
+					} 
+					if (radios[i].name == "manual") {
+						document.getElementById("angle1").disabled = !radios[i].checked;
+						document.getElementById("angle2").disabled = !radios[i].checked;
 					}
+				});
+			}
+
+			let ranges = document.querySelectorAll("input[type=range]");
+			for (let i = 0; i < ranges.length; i++) {
+				ranges[i].addEventListener("input", function () {
+					let path = "/set/" + ranges[i].id + "/" + parseFloat(ranges[i].value);
 					console.log(path);
 					fetch(FLASK_SERVER + path);
 				});
@@ -72,11 +88,23 @@
 			fetch(FLASK_SERVER + path)
 				.then(response => response.json())
 				.then(data => {
-					data.power = data.power == 'true';
-					console.log(data);
-					document.getElementById("power").checked = data.power;
+					data.angle1 = parseFloat(data.angle1);
+					data.angle2 = parseFloat(data.angle2);
+
+					// console.log(data);
+
+					document.querySelectorAll("input[type=radio]").forEach(radio => {
+						radio.checked = data.state == radio.value;
+					});
+					
+
+					document.getElementById("angle1").value = data.angle1;
+					document.getElementById("angle2").value = data.angle2;
+
+					document.getElementById("angle1").previousElementSibling.value = data.angle1.toFixed(1);
+					document.getElementById("angle2").previousElementSibling.value = data.angle2.toFixed(1);
 				});
-		}, 1000);
+		}, 250);
 
 	</script>
 </body>
