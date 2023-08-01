@@ -17,13 +17,25 @@
 	/>
 
 	<style>
-		body {
+#centerer {
+	display: flex;
+	flex-direction: column;
+}
+h1 {
+	color: #fff;
+}
+output {
+	font-weight: lighter;
+	color:rgb(125, 125, 125);
+	font-size: smaller;
+}
+body {
 	margin: 0;
 	display: grid;
 	place-items: center;
-	font-family: sans-serif;
+	font-family: sans-serif !important;
 	font-size: 1.8rem;
-	background: black; !important
+	background: black !important;
 }
 
 fieldset {
@@ -48,14 +60,15 @@ legend {
 }
 
 input[type="radio"] {
+	all: unset;
 	appearance: none;
 	-webkit-appearance: none;
 	width: 20px;
 	height: 20px;
-	border: 1px solid #fff;
+	border: 1px solid #fff !important;
 	border-radius: 50%;
 	margin-right: 10px;
-	background-color: transparent;
+	background-color: transparent !important;
 	position: relative;
 }
 
@@ -64,7 +77,7 @@ input[type="radio"]:checked::before {
 	display: block;
 	width: 12px;
 	height:12px;
-	background-color: #d1d6de;
+	background-color: #d1d6de !important;
 	border-radius: 50%;
 	position: absolute;
 	top: 50%;
@@ -106,7 +119,6 @@ div {
 		background-color: #d1d6de;
 	}
 }
-
 	</style>
 </head>
 
@@ -115,26 +127,26 @@ div {
 	<main>
 		<h1 style="text-align: center; margin: 0;">The <i>Fan</i> Favorite</h1>
 	
-
-		<fieldset>
-			<legend>Fan Mode: </legend>
-		
-			<div>
-				<input type="radio" id="automatic" name="mode" value="automatic">
-				<label for="automatic">Automatic</label>
-			</div>
-		
-			<div>
-				<input type="radio" id="manual" name="mode" value="manual">
-				<label for="manual">Manual</label>
-			</div>
-		
-			<div>
-				<input type="radio" id="off" name="mode" value="off">
-				<label for="off">Off</label>
-			</div>
-		</fieldset>
-
+		<div id="centerer">
+			<fieldset>
+				<legend><b>Fan Mode:</b></legend>
+			
+				<div>
+					<input type="radio" id="automatic" name="mode" value="automatic">
+					<label for="automatic">Automatic</label>
+				</div>
+			
+				<div>
+					<input type="radio" id="manual" name="mode" value="manual">
+					<label for="manual">Manual</label>
+				</div>
+			
+				<div>
+					<input type="radio" id="off" name="mode" value="off">
+					<label for="off">Off</label>
+				</div>
+			</fieldset>
+		</div>
 
 
 		<label for="angle1">Vertical Angle:</label>
@@ -168,7 +180,10 @@ div {
 					if (radios[i].id == "manual") {
 						document.getElementById("angle1").disabled = !radios[i].checked;
 						document.getElementById("angle2").disabled = !radios[i].checked;
-					} 
+					} else {
+						document.getElementById("angle1").disabled = radios[i].checked;
+						document.getElementById("angle2").disabled = radios[i].checked;
+					}
 					if (radios[i].id == "off") {
 						document.getElementById("speed").disabled = radios[i].checked;
 					} else {
