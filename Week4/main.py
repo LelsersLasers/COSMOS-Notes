@@ -234,7 +234,6 @@ try:
 
     for frame in camera.capture_continuous(rawframe, format="bgr", use_video_port=True):
 
-        print(current_state)
 
         reset_pos = False
 

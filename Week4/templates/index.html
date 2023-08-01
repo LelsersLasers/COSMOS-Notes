@@ -48,6 +48,10 @@
 		<output>90</output>
 		<input type="range" id="angle2" name="angle2" min="0.0" max="180.0" step="0.1" value="90" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
 
+		<label for="speed">Fan speed:</label>
+		<output>50</output>
+		<input type="range" id="speed" name="speed" min="0" max="100" step="1" value="50" oninput="this.previousElementSibling.value = this.value" disabled />
+
 	</main>
 
 	<script>
@@ -64,9 +68,14 @@
 						console.log(path);
 						fetch(FLASK_SERVER + path);
 					} 
-					if (radios[i].name == "manual") {
+					if (radios[i].id == "manual") {
 						document.getElementById("angle1").disabled = !radios[i].checked;
 						document.getElementById("angle2").disabled = !radios[i].checked;
+					} 
+					if (radios[i].id == "off") {
+						document.getElementById("speed").disabled = radios[i].checked;
+					} else {
+						document.getElementById("speed").disabled = !radios[i].checked;
 					}
 				});
 			}

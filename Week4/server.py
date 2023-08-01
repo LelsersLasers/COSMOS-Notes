@@ -16,25 +16,23 @@ state = {
 
 @app.route('/')
 def index():
-	# Return html page with control inputs
 	return render_template('index.html')
 
 
 @app.route('/set/speed/<speed>')
 def speed(speed):
-	# Set speed
-	return
+	state["speed"] = speed
+	write_state()
+	return "OK"
 
 @app.route('/set/angle1/<angle1>')
 def angle1(angle1):
-	# Set angle1, only if manual control is True
 	state["angle1"] = angle1
 	write_state()
 	return "OK"
 
 @app.route('/set/angle2/<angle2>')
 def angle2(angle2):
-	# Set angle2, only if manual control is True
 	state["angle2"] = angle2
 	write_state()
 	return "OK"
@@ -49,20 +47,17 @@ def set_state(new_state):
 
 @app.route('/get')
 def get():
-	# Return state as json
 	read_state()
 	return Response(json.dumps(state), mimetype='application/json')
 
 
 
 def write_state():
-	# Write state to file
 	with open(FILE, "w") as f:
 		json.dump(state, f)
 	return
 
 def read_state():
-	# Read state from file
 	global state
 	try:
 		with open(FILE, "r") as f:
