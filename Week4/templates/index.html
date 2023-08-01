@@ -15,6 +15,99 @@
 		rel="stylesheet"
 		href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.classless.min.css"
 	/>
+
+	<style>
+		body {
+	margin: 0;
+	display: grid;
+	place-items: center;
+	font-family: sans-serif;
+	font-size: 1.8rem;
+	background: black; !important
+}
+
+fieldset {
+	margin: 40px;
+	padding: 20px 20px 10px 20px;
+	border-radius: 20px;
+	background-color: rgba(255, 255, 255, 0.1);
+	box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+	display: inline-block;
+	border: none;
+}
+
+legend {
+	font-size: 28px;
+	font-weight: bold;
+	background: rgba(255, 255, 255, 0.1);
+	backdrop-filter: blur(2px);
+	border-radius: 20px;
+	padding: 10px 20px;
+	color: white;
+	box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+}
+
+input[type="radio"] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 20px;
+	height: 20px;
+	border: 1px solid #fff;
+	border-radius: 50%;
+	margin-right: 10px;
+	background-color: transparent;
+	position: relative;
+}
+
+input[type="radio"]:checked::before {
+	content: "";
+	display: block;
+	width: 12px;
+	height:12px;
+	background-color: #d1d6de;
+	border-radius: 50%;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	animation: appear 0.8s;
+}
+
+label {
+	font-size: 20px;
+	font-weight: bold;
+	color: #fff;
+}
+
+div {
+	display: flex;
+	align-items: center;
+	margin-bottom: 20px;
+}
+
+@keyframes appear {
+	0% {
+		transform: translate(-50%, -50%) scale(0);
+		background-color: #fff;
+	}
+	45% {
+		transform: translate(-50%, -50%) scale(1.6);
+		background-color: #d1d6de;
+	}
+	50% {
+		transform: translate(-50%, -50%) scale(1.7);
+		background-color: #d1d6de;
+	}
+	55% {
+		transform: translate(-50%, -50%) scale(1.6);
+	}
+	100% {
+		transform: translate(-50%, -50%) scale(1);
+		background-color: #d1d6de;
+	}
+}
+
+	</style>
 </head>
 
 <body>
@@ -22,20 +115,24 @@
 	<main>
 		<h1 style="text-align: center; margin: 0;">The <i>Fan</i> Favorite</h1>
 	
+
 		<fieldset>
-            <legend><strong>Fan Mode</strong></legend>
-            <label for="automatic">
-				<input type="radio" id="automatic" name="automatic" value="automatic" />
-				Automatic
-            </label>
-            <label for="manual">
-				<input type="radio" id="manual" name="manual" value="manual" />
-				Manual
-            </label>
-			<label for="off">
-				<input type="radio" id="off" name="off" value="off" checked />
-				Off
-            </label>
+			<legend>Fan Mode: </legend>
+		
+			<div>
+				<input type="radio" id="automatic" name="mode" value="automatic">
+				<label for="automatic">Automatic</label>
+			</div>
+		
+			<div>
+				<input type="radio" id="manual" name="mode" value="manual">
+				<label for="manual">Manual</label>
+			</div>
+		
+			<div>
+				<input type="radio" id="off" name="mode" value="off">
+				<label for="off">Off</label>
+			</div>
 		</fieldset>
 
 
@@ -116,4 +213,6 @@
 		}, 250);
 
 	</script>
+
+
 </body>
