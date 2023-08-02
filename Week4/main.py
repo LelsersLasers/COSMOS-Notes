@@ -134,10 +134,10 @@ AUDIO_CHANNEL = 7
 mcp = Adafruit_MCP3008.MCP3008(spi=SPI.SpiDev(0,0))
 
 def read_audio():
-    value = mcp.read_adc(AUDIO_CHANNEL)
-    print(value)
-    return value
-    # return mcp.read_adc(AUDIO_CHANNEL)
+    # value = mcp.read_adc(AUDIO_CHANNEL)
+    # print(value)
+    # return value
+    return mcp.read_adc(AUDIO_CHANNEL)
 
 def check_clap():
     return read_audio() > AUDIO_THRESHOLD
