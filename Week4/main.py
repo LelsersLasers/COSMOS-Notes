@@ -21,14 +21,17 @@ import face_detect
 
 """
 TODO:
-- Fan
-    - Mounting
-    - Link speed/modes to website
-- 3d print
-    - Housing
-    - Mounting
+- Construction
+    - Recenter base servo the other way
+    - Glue base servo to base
+    - Glue top servo to base servo
 - Presentation
-- Tuning
+    - Fancier wording
+    - Images, GIFs, videos
+- Testing, tuning, presentation worthy
+- LEDS?
+- Documentation
+    - README
 """
 
 #------------------------------------------------------------------------------#
