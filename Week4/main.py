@@ -15,6 +15,7 @@ import Adafruit_MCP3008
 
 import time
 import json
+import base64
 
 import face_detect
 
@@ -22,23 +23,23 @@ import face_detect
 TODO:
 - Fan
     - Mounting
-    - Controling speed/on/off
+    - Link speed/modes to website
 - 3d print
     - Housing
     - Mounting
 - Presentation
 - Tuning
-- Website controller (super reach)
 """
 
 #------------------------------------------------------------------------------#
 FILE = "state.json"
 
 state = {
-    "speed": 50,
+    "speed": 100,
     "angle1": -1.0,
     "angle2": -1.0,
-    "state": "off"
+    "state": "off",
+    "image": ""
 }
 
 def write_state():
@@ -55,11 +56,32 @@ def read_state():
             state = json.load(f)
             state["angle1"] = float(state["angle1"])
             state["angle2"] = float(state["angle2"])
+            state["speed"] = int(state["speed"])
     except:
         time.sleep(0.1)
         read_state()
 
+def get_scaled_speed():
+    base_speed = state["speed"]
+    return int(scale(base_speed, 0, 100, 16, 100))
+#------------------------------------------------------------------------------#
+GPIO.setmode(GPIO.BCM)
 
+GPIO_Ain1 = 17
+GPIO_Ain2 = 22
+GPIO_Apwm = 27
+
+GPIO.setup(GPIO_Ain1, GPIO.OUT)
+GPIO.setup(GPIO_Ain2, GPIO.OUT)
+GPIO.setup(GPIO_Apwm, GPIO.OUT)
+
+GPIO.output(GPIO_Ain1, True)
+GPIO.output(GPIO_Ain2, False)
+
+pwm_frequency = 50
+
+fan_pwm = GPIO.PWM(GPIO_Apwm, pwm_frequency)
+fan_pwm.start(0)
 #------------------------------------------------------------------------------#
 factory = PiGPIOFactory()
 
@@ -112,10 +134,10 @@ AUDIO_CHANNEL = 7
 mcp = Adafruit_MCP3008.MCP3008(spi=SPI.SpiDev(0,0))
 
 def read_audio():
-    # value = mcp.read_adc(AUDIO_CHANNEL)
-    # print(value)
-    # return value
-    return mcp.read_adc(AUDIO_CHANNEL)
+    value = mcp.read_adc(AUDIO_CHANNEL)
+    print(value)
+    return value
+    # return mcp.read_adc(AUDIO_CHANNEL)
 
 def check_clap():
     return read_audio() > AUDIO_THRESHOLD
@@ -162,6 +184,7 @@ class ModeFSM:
                 self.time_in_state = 0.0
 
                 state["state"] = "off"
+                state["speed"] = 100
                 write_state()
                 
                 return True
@@ -180,7 +203,7 @@ class ModeFSM:
             return "MANUAL"            
 
     def fan_should_be_on(self):
-        return self.current_state in [ModeFSM.TRACKING, ModeFSM.WAITING]
+        return self.current_state in [ModeFSM.TRACKING, ModeFSM.WAITING, ModeFSM.MANUAL]
 
 current_state = ModeFSM()
 #------------------------------------------------------------------------------#
@@ -245,11 +268,15 @@ try:
         if old_state_state != state["state"]:
             if state["state"] == "manual":
                 current_state.current_state = ModeFSM.MANUAL
+                state["speed"] = 100
             elif state["state"] == "off":
                 current_state.current_state = ModeFSM.OFF
                 reset_pos = True
+                state["speed"] = 100
             elif state["state"] == "automatic":
                 current_state.current_state = ModeFSM.SCANNING
+                state["speed"] = 100
+            write_state()
             
 
 
@@ -277,11 +304,13 @@ try:
                     current_state.current_state = ModeFSM.SCANNING
 
                     state["state"] = "automatic"
+                    state["speed"] = 100
                     write_state()
                 else:
                     current_state.current_state = ModeFSM.OFF
 
                     state["state"] = "off"
+                    state["speed"] = 100
                     write_state()
                     
                 reset_pos = True
@@ -413,7 +442,11 @@ try:
         top_servo.value = angle_to_value(vertical_angle)
         state["angle1"] = vertical_angle
 
-        write_state()
+        if current_state.fan_should_be_on():
+            fan_pwm.ChangeDutyCycle(get_scaled_speed())
+            # print(get_scaled_speed())
+        else:
+            fan_pwm.ChangeDutyCycle(0)
         #----------------------------------------------------------------------#
     
 
@@ -433,8 +466,15 @@ try:
         bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
         cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
 
-        cv2.imshow('image', image)
-        cv2.waitKey(1)
+        # retval, buffer = cv2.imencode('.jpg', image)
+        # jpg_as_text = base64.b64encode(buffer)
+        state["image"] = base64.b64encode(cv2.imencode('.jpg', image)[1]).decode()
+
+        write_state()
+
+
+        # cv2.imshow('image', image)
+        # cv2.waitKey(1)
         #----------------------------------------------------------------------#
 
         rawframe.truncate(0)
@@ -452,6 +492,9 @@ finally:
         time.sleep(0.5)
 
     finally:
+
+        fan_pwm.stop()
+        GPIO.cleanup()
 
         cv2.destroyAllWindows()
         camera.close()

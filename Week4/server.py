@@ -10,7 +10,8 @@ state = {
 	"speed": 50,
 	"angle1": 75.0,
 	"angle2": 90.0,
-	"state": "off"
+	"state": "off",
+	"image": ""
 }
 
 
@@ -41,7 +42,6 @@ def angle2(angle2):
 def set_state(new_state):
 	state["state"] = new_state
 	write_state()
-
 	return "OK"
 
 
@@ -69,4 +69,5 @@ def read_state():
 
 
 if __name__ == "__main__":
+	read_state()
 	app.run(debug=True, port=5000, host='0.0.0.0')

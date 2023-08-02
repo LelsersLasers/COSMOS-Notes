@@ -17,10 +17,6 @@
 	/>
 
 	<style>
-#centerer {
-	display: flex;
-	flex-direction: column;
-}
 h1 {
 	color: #fff;
 }
@@ -119,6 +115,10 @@ div {
 		background-color: #d1d6de;
 	}
 }
+.centerer {
+	display: flex;
+	flex-direction: column;
+}
 	</style>
 </head>
 
@@ -127,7 +127,7 @@ div {
 	<main>
 		<h1 style="text-align: center; margin: 0;">The <i>Fan</i> Favorite</h1>
 	
-		<div id="centerer">
+		<div class="centerer">
 			<fieldset>
 				<legend><b>Fan Mode:</b></legend>
 			
@@ -147,6 +147,10 @@ div {
 				</div>
 			</fieldset>
 		</div>
+		
+		<div class="centerer">
+			<img id="frame" />
+		</div>
 
 
 		<label for="angle1">Vertical Angle:</label>
@@ -159,7 +163,7 @@ div {
 
 		<label for="speed">Fan speed:</label>
 		<output>50</output>
-		<input type="range" id="speed" name="speed" min="0" max="100" step="1" value="50" oninput="this.previousElementSibling.value = this.value" disabled />
+		<input type="range" id="speed" name="speed" min="1" max="100" step="1" value="50" oninput="this.previousElementSibling.value = this.value" disabled />
 
 	</main>
 
@@ -212,11 +216,31 @@ div {
 					data.angle1 = parseFloat(data.angle1);
 					data.angle2 = parseFloat(data.angle2);
 
-					// console.log(data);
-
 					document.querySelectorAll("input[type=radio]").forEach(radio => {
 						radio.checked = data.state == radio.value;
+						if (radio.id == "manual") {
+							if (radio.checked) {
+								document.getElementById("angle1").disabled = false;
+								document.getElementById("angle2").disabled = false;
+							} else {
+								document.getElementById("angle1").disabled = true;
+								document.getElementById("angle2").disabled = true;
+							}
+						} else if (radio.id == "off") {
+							if (radio.checked) {
+								document.getElementById("speed").disabled = true;
+							} else {
+								document.getElementById("speed").disabled = false;
+							}
+						}
 					});
+
+					try {
+						document.getElementById("frame").src = "data:image/jpg;base64," + data.image;
+					} catch (e) {
+						console.log(e);
+					}
+			
 					
 
 					document.getElementById("angle1").value = data.angle1;
@@ -225,7 +249,7 @@ div {
 					document.getElementById("angle1").previousElementSibling.value = data.angle1.toFixed(1);
 					document.getElementById("angle2").previousElementSibling.value = data.angle2.toFixed(1);
 				});
-		}, 250);
+		}, 100);
 
 	</script>
 
