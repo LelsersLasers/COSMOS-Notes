@@ -272,10 +272,19 @@ try:
 
     for frame in camera.capture_continuous(rawframe, format="bgr", use_video_port=True):
 
+        image = frame.array
 
         reset_pos = False
 
+        #----------------------------------------------------------------------#
+        t1 = time.time()
+        delta = t1 - t0
+        t0 = t1
+        # print(f"Delta: {int(delta * 1000)}ms\tFPS: {int(1 / delta)}")
+        #----------------------------------------------------------------------#
 
+
+        #----------------------------------------------------------------------#
         old_state_state = state["state"]
 
         read_state()
@@ -292,19 +301,6 @@ try:
                 current_state.current_state = ModeFSM.SCANNING
                 state["speed"] = 100
             write_state()
-            
-
-
-        #----------------------------------------------------------------------#
-        t1 = time.time()
-        delta = t1 - t0
-        t0 = t1
-        # print(f"Delta: {int(delta * 1000)}ms\tFPS: {int(1 / delta)}")
-        #----------------------------------------------------------------------#
-
-
-        #----------------------------------------------------------------------#
-        image = frame.array
         #----------------------------------------------------------------------#
 
 
@@ -355,8 +351,26 @@ try:
             else:
                 last_center_x = None
                 last_center_y = None
+        #----------------------------------------------------------------------#
+        
 
-            read_state()
+        #----------------------------------------------------------------------#
+        old_state_state = state["state"]
+
+        read_state()
+
+        if old_state_state != state["state"]:
+            if state["state"] == "manual":
+                current_state.current_state = ModeFSM.MANUAL
+                state["speed"] = 100
+            elif state["state"] == "off":
+                current_state.current_state = ModeFSM.OFF
+                reset_pos = True
+                state["speed"] = 100
+            elif state["state"] == "automatic":
+                current_state.current_state = ModeFSM.SCANNING
+                state["speed"] = 100
+            write_state()
         #----------------------------------------------------------------------#
 
         if not current_state.fan_should_be_on():
@@ -484,12 +498,13 @@ try:
 
         # fps text (bottom left)
         font                   = cv2.FONT_HERSHEY_SIMPLEX
-        bottomLeftCornerOfText = (10, SCREEN_SIZE[1] - 10)
-        fontScale              = 1
+        bottomLeftCornerOfText = (5, SCREEN_SIZE[1] - 5)
+        fontScale              = 0.5
         fontColor              = (0, 0, 255)
         thickness              = 1
         lineType               = 2
-        cv2.putText(image, str(int(1 / delta)), bottomLeftCornerOfText, font, fontScale, fontColor, thickness, lineType)
+        text                   = "FPS: %.2f" % (1 / delta)
+        cv2.putText(image, text, bottomLeftCornerOfText, font, fontScale, fontColor, thickness, lineType)
 
 
         state["image"] = base64.b64encode(cv2.imencode('.jpg', image)[1]).decode()
