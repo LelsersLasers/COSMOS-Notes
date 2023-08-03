@@ -82,6 +82,24 @@ pwm_frequency = 50
 fan_pwm = GPIO.PWM(GPIO_Apwm, pwm_frequency)
 fan_pwm.start(0)
 #------------------------------------------------------------------------------#
+GPIO_RED = 14
+GPIO_BLUE = 18
+GPIO_GREEN = 15
+GPIO_LEDS = [GPIO_RED, GPIO_BLUE, GPIO_GREEN]
+
+for gpio in GPIO_LEDS:
+    GPIO.setup(gpio, GPIO.OUT)
+    GPIO.output(gpio, GPIO.LOW)
+
+def set_leds():
+    mode = state["state"]
+    modes = ["off", "manual", "automatic"]
+    for i in range(len(modes)):
+        if mode == modes[i]:
+            GPIO.output(GPIO_LEDS[i], GPIO.HIGH)
+        else:
+            GPIO.output(GPIO_LEDS[i], GPIO.LOW)
+#------------------------------------------------------------------------------#
 factory = PiGPIOFactory()
 
 top_servo = Servo(13, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000, pin_factory=factory)
@@ -465,12 +483,13 @@ try:
         bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
         cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
 
-        # retval, buffer = cv2.imencode('.jpg', image)
-        # jpg_as_text = base64.b64encode(buffer)
         state["image"] = base64.b64encode(cv2.imencode('.jpg', image)[1]).decode()
+        #----------------------------------------------------------------------#
 
+
+        #----------------------------------------------------------------------#
         write_state()
-
+        set_leds()
 
         # cv2.imshow('image', image)
         # cv2.waitKey(1)
@@ -493,6 +512,10 @@ finally:
     finally:
 
         fan_pwm.stop()
+
+        for gpio in GPIO_LEDS:
+            GPIO.output(gpio, GPIO.LOW)
+
         GPIO.cleanup()
 
         cv2.destroyAllWindows()
