@@ -112,12 +112,12 @@ def angle_to_value(angle):
 
 # VERTICAL_ANGLE_SPEED = 10.0
 VERTICAL_ANGLE_MIN = 45.0
-VERTICAL_ANGLE_MAX = 135.0
+VERTICAL_ANGLE_MAX = 120.0
 VERTICAL_ANGLE_CENTER = 75.0
 
 HORIZONTAL_ANGLE_MIN = 0.0
-HORIZONTAL_ANGLE_MAX = 140.0
-HORIZONTAL_ANGLE_CENTER = 105.0
+HORIZONTAL_ANGLE_MAX = 130.0
+HORIZONTAL_ANGLE_CENTER = 90.0
 
 HORIZONTAL_TRACKING_SPEED = 30.0 # degrees per second
 VERTICAL_TRACKING_TICK = 15.0 # degrees
@@ -128,10 +128,10 @@ bot_servo.value = angle_to_value(HORIZONTAL_ANGLE_CENTER)
 state["angle1"] = VERTICAL_ANGLE_CENTER
 state["angle2"] = HORIZONTAL_ANGLE_CENTER
 
-K_P = 0.8
-K_D = 0.05
+K_P = 0.6
+K_D = 0.1
 
-DEAD_ZONE_SIZE = 0.1
+DEAD_ZONE_SIZE = 0.2
 
 
 vertical_angle = VERTICAL_ANGLE_CENTER
@@ -305,7 +305,6 @@ try:
 
         #----------------------------------------------------------------------#
         image = frame.array
-        grey_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         #----------------------------------------------------------------------#
 
 
@@ -335,7 +334,7 @@ try:
 
         #----------------------------------------------------------------------#
         if current_state.current_state not in [ModeFSM.OFF, ModeFSM.MANUAL]:
-            face = face_detect.detect_largest_face(grey_image, SCREEN_SIZE)
+            face = face_detect.detect_largest_face_dnn(image, SCREEN_SIZE)
             should_reset_pos = current_state.update(face, delta)
 
             reset_pos = reset_pos or should_reset_pos
@@ -356,6 +355,8 @@ try:
             else:
                 last_center_x = None
                 last_center_y = None
+
+            read_state()
         #----------------------------------------------------------------------#
 
         if not current_state.fan_should_be_on():
