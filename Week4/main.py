@@ -21,10 +21,6 @@ import face_detect
 
 """
 TODO:
-- Construction
-    - Recenter base servo the other way
-    - Glue base servo to base
-    - Glue top servo to base servo
 - Presentation
     - Fancier wording
     - Images, GIFs, videos
@@ -237,8 +233,8 @@ VERTICAL_CAMERA_FOV_SCALE_FACTOR = math.tan(deg_to_rad(VERTICAL_CAMERA_FOV / 2.0
 camera = picamera.PiCamera()
 camera.resolution = (SCREEN_SIZE[0], SCREEN_SIZE[1])
 camera.framerate = FRAMERATE
-camera.vflip = False
-camera.hflip = False
+camera.vflip = True
+camera.hflip = True
 
 rawframe = picamera.array.PiRGBArray(camera, size=(SCREEN_SIZE[0], SCREEN_SIZE[1]))
 #------------------------------------------------------------------------------#
