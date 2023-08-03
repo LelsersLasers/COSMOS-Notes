@@ -482,6 +482,16 @@ try:
         bottom_right = (int(SCREEN_SIZE[0] * (1 + DEAD_ZONE_SIZE) / 2), int(SCREEN_SIZE[1] * (1 + DEAD_ZONE_SIZE) / 2))
         cv2.rectangle(image, top_left, bottom_right, (0, 0, 255), 2)
 
+        # fps text (bottom left)
+        font                   = cv2.FONT_HERSHEY_SIMPLEX
+        bottomLeftCornerOfText = (10, SCREEN_SIZE[1] - 10)
+        fontScale              = 1
+        fontColor              = (0, 0, 255)
+        thickness              = 1
+        lineType               = 2
+        cv2.putText(image, str(int(1 / delta)), bottomLeftCornerOfText, font, fontScale, fontColor, thickness, lineType)
+
+
         state["image"] = base64.b64encode(cv2.imencode('.jpg', image)[1]).decode()
         #----------------------------------------------------------------------#
 
