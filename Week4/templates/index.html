@@ -124,11 +124,11 @@ div {
 
 <body>
 
-	<main>
+	<main style="padding-top: 0;">
 		<h1 style="text-align: center; margin: 0;">The <i>Fan</i> Favorite</h1>
 	
 		<div class="centerer">
-			<fieldset>
+			<fieldset style="margin-top: 10px; margin-bottom: 5px;">
 				<legend><b>Fan Mode:</b></legend>
 			
 				<div>
@@ -154,12 +154,12 @@ div {
 
 
 		<label for="angle1">Vertical Angle:</label>
-		<output>75</output>
+		<output>75.0</output>
 		<input type="range" id="angle1" name="angle1" min="45.0" max="135.0" step="0.1" value="75" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
 
 		<label for="angle2">Horizontal Angle:</label>
-		<output>90</output>
-		<input type="range" id="angle2" name="angle2" min="0.0" max="180.0" step="0.1" value="90" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
+		<output>105.0</output>
+		<input type="range" id="angle2" name="angle2" min="0.0" max="150.0" step="0.1" value="90" oninput="this.previousElementSibling.value = parseFloat(this.value).toFixed(1)" disabled />
 
 		<label for="speed">Fan speed:</label>
 		<output>100</output>

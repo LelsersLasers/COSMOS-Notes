@@ -24,8 +24,6 @@ TODO:
 - Presentation
     - Fancier wording
     - Images, GIFs, videos
-- Testing, tuning, presentation worthy
-- LEDS?
 - Documentation
     - README
 """
@@ -118,8 +116,8 @@ VERTICAL_ANGLE_MAX = 135.0
 VERTICAL_ANGLE_CENTER = 75.0
 
 HORIZONTAL_ANGLE_MIN = 0.0
-HORIZONTAL_ANGLE_MAX = 180.0
-HORIZONTAL_ANGLE_CENTER = 90.0
+HORIZONTAL_ANGLE_MAX = 150.0
+HORIZONTAL_ANGLE_CENTER = 105.0
 
 HORIZONTAL_TRACKING_SPEED = 30.0 # degrees per second
 VERTICAL_TRACKING_TICK = 15.0 # degrees
