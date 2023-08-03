@@ -40,10 +40,10 @@ def detect_largest_face(grey_image, screen_size):
         return max(faces, key=FaceDetected.calc_area)
 
 def detect_faces(grey_image, screen_size):
-    frontal_faces = frontal_face_cascade.detectMultiScale(grey_image, scaleFactor=1.35, minNeighbors=6, minSize=(30, 30))
+    frontal_faces = frontal_face_cascade.detectMultiScale(grey_image, scaleFactor=1.3, minNeighbors=5)
 
-    profile_faces_1 = profile_face_cascade.detectMultiScale(grey_image,  scaleFactor=1.35, minNeighbors=6, minSize=(30, 30))
-    profile_faces_2 = profile_face_cascade.detectMultiScale(cv2.flip(grey_image, 1),  scaleFactor=1.35, minNeighbors=6, minSize=(30, 30))
+    profile_faces_1 = profile_face_cascade.detectMultiScale(grey_image,  scaleFactor=1.3, minNeighbors=5)
+    profile_faces_2 = profile_face_cascade.detectMultiScale(cv2.flip(grey_image, 1),  scaleFactor=1.3, minNeighbors=5)
 
     face_results = [(frontal_faces, False), (profile_faces_1, False), (profile_faces_2, True)]
     
